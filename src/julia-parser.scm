@@ -90,6 +90,7 @@
 			 function macro quote let local global const
 			 abstract typealias type bitstype immutable ccall do
 			 module baremodule using import export importall))
+(define deprecated-words '(then))
 
 (define (syntactic-op? op) (memq op syntactic-operators))
 (define (syntactic-unary-op? op) (memq op syntactic-unary-operators))
@@ -853,6 +854,15 @@
 ;; also handles looking for syntactic reserved words
 (define (parse-call s)
   (let ((ex (parse-unary-prefix s)))
+    (if (memq ex deprecated-words)
+      (io.write *stderr*
+    	(string
+    	 #\newline "WARNING: deprecated identifier \"" ex "\" will be reserved in the future"
+    	 (if (eq? current-filename 'none)
+    	     ""
+    	     (string
+    	      " at "
+    	      current-filename ":" (input-port-line (ts:port s)))) ".")))
     (if (memq ex reserved-words)
 	(parse-resword s ex)
 	(parse-call-chain s ex #f))))
