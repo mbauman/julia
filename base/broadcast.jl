@@ -389,6 +389,45 @@ for (f, cachef, scalarf) in ((:.==, :bitcache_eq , :(==)),
     end
 end
 
+# Tuple and array element-wise comparisons
+
+for (f, scalarf) in ((:.==, :(==)),
+                     (:.< , :<   ),
+                     (:.!=, :!=  ),
+                     (:.<=, :<=  ))
+    for (sigA, sigB) in ((:Tuple, :Tuple),
+                         (:Tuple, :AbstractArray),
+                         (:AbstractArray, :Tuple))
+        @eval begin
+            function ($f)(A::$sigA, B::$sigB)
+                len = length(A)
+                len == length(B) || throw(DimensionMismatch(""))
+                F = BitArray(len)
+                for ind = 1:len
+                    F[ind] = ($scalarf)(A[ind],B[ind])
+                end
+                return F
+            end
+        end
+    end
+    for (sigA, sigB, expA, expB, len) in ((:Any, :Tuple,
+                                           :A, :(B[ind]),
+                                           :(length(B))),
+                                          (:Tuple, :Any,
+                                           :(A[ind]), :B,
+                                           :(length(A))))
+        @eval begin
+            function ($f)(A::$sigA, B::$sigB)
+                b = BitArray($len)
+                for ind = 1:$len
+                    b[ind] = ($scalarf)($expA, $expB)
+                end
+                return b
+            end
+        end
+    end
+end
+
 ## specialized element-wise operators for BitArray
 
 (.^)(A::BitArray, B::AbstractArray{Bool}) = (B .<= A)
