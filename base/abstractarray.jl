@@ -124,7 +124,16 @@ function reshape(a::AbstractArray, dims::Dims)
     end
     copy!(similar(a, dims), a)
 end
-reshape(a::AbstractArray, dims::Int...) = reshape(a, dims)
+reshape(a::AbstractArray, dims::Union(Int,Colon)...) = reshape(a, dims)
+
+# Allow missing dimensions with :
+function reshape{N}(a::AbstractArray, dims::NTuple{N, Union(Int, Colon)})
+    missing_mask = [isa(x, Colon) for x in dims]
+    sum(missing_mask) == 1 || throw(DimensionMismatch("new dimensions $(dims) may only have up to one omitted dimension"))
+    sz, remainder = divrem(length(a), prod(dims[!missing_mask]))
+    remainder == 0 || throw(DimensionMismatch("array size $(length(a)) must be divisible by the product of the new dimensions $(dims[!missing_mask])"))
+    reshape(a, map(x->isa(x, Colon) ? sz : x, dims))
+end
 
 vec(a::AbstractArray) = reshape(a,length(a))
 vec(a::AbstractVector) = a
