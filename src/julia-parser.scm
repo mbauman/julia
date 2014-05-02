@@ -1397,7 +1397,9 @@
 		       (begin (take-token s) (loop (cons nxt lst))))
 		      ((eqv? c #\;)          (loop (cons nxt lst)))
 		      ((equal? c closer)     (loop (cons nxt lst)))
-		      ((eq? c 'for)          (take-token s) (parse-generator s t closer))
+		      ((eq? c 'for)
+		       (take-token s)
+		       (reverse (cons (parse-generator s nxt closer) lst)))
 		      ;; newline character isn't detectable here
 		      #;((eqv? c #\newline)
 		       (error "unexpected line break in argument list"))
