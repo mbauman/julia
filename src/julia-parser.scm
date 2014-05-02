@@ -1339,7 +1339,7 @@
 		     (else
 		      (error "invalid iteration specification")))))
 	(case (peek-token s)
-	  ((#\,)  (take-token s) (loop (cons r ranges)))
+      	  ((#\,)  (take-token s) (loop (cons r ranges)))
 	  (else   (reverse! (cons r ranges))))))))
 
 (define (parse-space-separated-exprs s)
@@ -1397,6 +1397,7 @@
 		       (begin (take-token s) (loop (cons nxt lst))))
 		      ((eqv? c #\;)          (loop (cons nxt lst)))
 		      ((equal? c closer)     (loop (cons nxt lst)))
+		      ((eq? c 'for)          (take-token s) (parse-generator s t closer))
 		      ;; newline character isn't detectable here
 		      #;((eqv? c #\newline)
 		       (error "unexpected line break in argument list"))
@@ -1451,6 +1452,13 @@
     (if (dict-literal? (cadr c))
         `(dict_comprehension ,@(cdr c))
         (error "invalid dict comprehension"))))
+
+(define (parse-generator s first closer)
+  (let ((r (parse-comma-separated-iters s)))
+    (if (not (eqv? (require-token s) closer))
+	(error (string "expected " closer))
+        (take-token s))
+    `(macrocall @generator ,first ,@r)))
 
 (define (parse-matrix s first closer)
   (define (fix head v) (cons head (reverse v)))
@@ -1759,6 +1767,10 @@
 		     ((eqv? t #\, )
 		      ;; tuple (x,) (x,y) (x...) etc.
 		      (parse-tuple s ex))
+		     ((eq? t 'for)
+		      ;; generator (x for x in xs) (x for x=xs, y=ys) etc.
+		      (take-token s)
+                      (parse-generator s ex #\)))
 		     ((eqv? t #\;)
 		      ;; parenthesized block (a;b;c)
 		      (take-token s)
