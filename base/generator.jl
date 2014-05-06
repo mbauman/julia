@@ -1,5 +1,5 @@
 # Remove once part of standard library:
-import Base: return_type, show, writemime, size, strides, isassigned, getindex, convert, ntuple
+import Base: return_type, show, writemime, size, strides, isassigned, getindex, convert, ntuple, length
 
 abstract AbstractGenerator{T,N} <: DenseArray{T,N}
 
@@ -40,6 +40,7 @@ show(io::IO, g::AbstractGenerator) = print(io, summary(g), ": ", g.name)
 ## Basic functions ##
 size(g::Generator) = map(length, g.itrs)
 size{T,N}(g::Generator{T,N}, d) = d > N ? 1 : length(g.itrs[d])
+length(g::Generator) = prod(size(g)) # May be bigger than Int
 
 strides{T}(g::AbstractGenerator{T,1}) = (1,)
 strides{T}(g::AbstractGenerator{T,2}) = (1, size(g,1))
