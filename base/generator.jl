@@ -26,10 +26,10 @@ macro generator(thunk, assignments...)
     # 2. Combine with arg symbols: (sym1::eltype(itr1), sym2::eltype(itr2), ...)
     typed_args = map((sym,typ) -> Expr(symbol("::"), sym, typ), args, type_exprs)
     # 3. And create the anonymous func (with the args in a tuple expression)
-    # func = Expr(symbol("->"), Expr(:tuple, typed_args...), thunk)
-    func = Expr(symbol("->"), Expr(:tuple, args...), thunk)
+    #func = Expr(symbol("->"), Expr(:tuple, typed_args...), Expr(:block, thunk))
+    func = Expr(symbol("->"), Expr(:tuple, args...), Expr(:block, thunk))
     # 4. Finally, return the top-level Generator call
-    Expr(:call, :Generator, name, func, Expr(:tuple, itrs...), Expr(:tuple, type_exprs...))
+    esc(Expr(:call, :Generator, name, func, Expr(:tuple, itrs...), Expr(:tuple, type_exprs...)))
 end
 
 
