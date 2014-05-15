@@ -528,7 +528,7 @@ if WORD_SIZE==32
         w2 = t>>32
         w1 = u0*v1 + (t&0xffffffff)
         hi = u1*v1 + w2 + (w1 >> 32)
-        lo = w0&0xffffffff + (w1 << 32)
+        lo = (w0&0xffffffff) + (w1 << 32)
         int128(hi)<<64 + int128(uint128(lo))
     end
 
@@ -543,7 +543,7 @@ if WORD_SIZE==32
         w2 = t>>>32
         w1 = u0*v1 + (t&0xffffffff)
         hi = u1*v1 + w2 + (w1 >>> 32)
-        lo = w0&0xffffffff + (w1 << 32)
+        lo = (w0&0xffffffff) + (w1 << 32)
         uint128(hi)<<64 + uint128(lo)
     end
 
