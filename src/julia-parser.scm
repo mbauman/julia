@@ -7,12 +7,14 @@
      ; the way the lexer works, every prefix of an operator must also
      ; be an operator.
      (-- -->)
+     (|\||)
+     (&)
      (> < >= ≥ <= ≤ == === ≡ != ≠ !== ≢ |.>| |.<| |.>=| |.≥| |.<=| |.≤| |.==| |.!=| |.≠| |.=| |.!| |<:| |>:| ∈ ∉ ∋ ∌ ⊆ ⊈ ⊂ ⊄ ⊊)
      (|\|>| |<\||)
      (: |..|)
-     (+ - ⊕ ⊖ ⊞ ⊟ |.+| |.-| |\|| ∪ ∨ $ ⊔)
+     (+ - ⊕ ⊖ ⊞ ⊟ |.+| |.-| ∪ ∨ $ ⊔)
      (<< >> >>> |.<<| |.>>| |.>>>|)
-     (* / |./| ÷ % ⋅ ∘ × |.%| |.*| |\\| |.\\| & ∩ ∧ ⊗ ⊘ ⊙ ⊚ ⊛ ⊠ ⊡ ⊓)
+     (* / |./| ÷ % ⋅ ∘ × |.%| |.*| |\\| |.\\| ∩ ∧ ⊗ ⊘ ⊙ ⊚ ⊛ ⊠ ⊡ ⊓)
      (// .//)
      (^ |.^|)
      (|::|)
@@ -666,9 +668,11 @@
 ; parse-comma is needed for commas outside parens, for example a = b,c
 (define (parse-comma s) (parse-Nary s parse-cond  '(#\,) 'tuple '() #f))
 (define (parse-or s)    (parse-LtoR s parse-and   (prec-ops 2)))
-(define (parse-and s)   (parse-LtoR s parse-arrow (prec-ops 3)))
-(define (parse-arrow s) (parse-RtoL s parse-ineq  (prec-ops 4)))
-(define (parse-ineq s)  (parse-comparison s (prec-ops 5)))
+(define (parse-and s)   (parse-LtoR s parse-bitor (prec-ops 3)))
+(define (parse-bitor s) (parse-LtoR s parse-bitand (prec-ops 4)))
+(define (parse-bitand s) (parse-LtoR s parse-arrow (prec-ops 5)))
+(define (parse-arrow s) (parse-RtoL s parse-ineq  (prec-ops 6)))
+(define (parse-ineq s)  (parse-comparison s (prec-ops 7)))
 
 ;; parse left to right chains of a certain binary operator
 ;; returns a list of arguments
@@ -709,17 +713,17 @@
 		  (else
 		   (loop (list 'call t ex (down s))))))))))
 
-(define expr-ops (prec-ops 8))
+(define expr-ops (prec-ops 10))
 (define (parse-expr s) (parse-with-chains s parse-shift expr-ops '+))
 
-(define (parse-shift s) (parse-LtoR s parse-term (prec-ops 9)))
+(define (parse-shift s) (parse-LtoR s parse-term (prec-ops 11)))
 
-(define term-ops (prec-ops 10))
+(define term-ops (prec-ops 12))
 (define (parse-term s) (parse-with-chains s parse-rational term-ops '*))
 
-(define (parse-rational s) (parse-LtoR s parse-unary (prec-ops 11)))
+(define (parse-rational s) (parse-LtoR s parse-unary (prec-ops 13)))
 
-(define (parse-pipes s)    (parse-LtoR s parse-range (prec-ops 6)))
+(define (parse-pipes s)    (parse-LtoR s parse-range (prec-ops 8)))
 
 (define (parse-in s)       (parse-LtoR s parse-pipes '(in)))
 
@@ -822,7 +826,7 @@
 ; -2^3 is parsed as -(2^3), so call parse-decl for the first argument,
 ; and parse-unary from then on (to handle 2^-3)
 (define (parse-factor s)
-  (parse-factor-h s parse-decl (prec-ops 12)))
+  (parse-factor-h s parse-decl (prec-ops 14)))
 
 (define (parse-decl s)
   (let loop ((ex (parse-call s)))
