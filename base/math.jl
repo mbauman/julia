@@ -781,7 +781,7 @@ function psifn(x::Float64, n::Int, kode::Int, m::Int)
 #***first executable statement  dpsifn
     if x <= 0.0 throw(DomainError()) end
     if n < 0 error("n must be non-negative") end
-    if kode < 1 | kode > 2 error("kode must be one or two") end
+    if kode < 1 || kode > 2 error("kode must be one or two") end
     if m < 1 error("m must be larger than one") end
     mm = m
     const nx = min(-exponent(realmin(Float64)) + 1, exponent(realmax(Float64)))
@@ -1512,7 +1512,7 @@ function mod2pi(x::Float64) # or modtau(x)
     (n,y) = ieee754_rem_pio2(x)
 
     if iseven(n)
-        if n & 2 == 2 # add pi
+        if (n & 2) == 2 # add pi
             return add22condh(y[1],y[2],pi2o2_h,pi2o2_l)
         else # add 0 or 2pi
             if y[1] > 0.0
@@ -1522,7 +1522,7 @@ function mod2pi(x::Float64) # or modtau(x)
             end
         end
     else # add pi/2 or 3pi/2
-        if n & 2 == 2 # add 3pi/2
+        if (n & 2) == 2 # add 3pi/2
             return add22condh(y[1],y[2],pi3o2_h,pi3o2_l) 
         else # add pi/2
             return add22condh(y[1],y[2],pi1o2_h,pi1o2_l) 
