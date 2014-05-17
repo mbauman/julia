@@ -480,7 +480,7 @@
   (let loop ((ex  (down s))
 	     (t   (peek-token s))
 	     (spc (ts:space? s)))
-    (if (not (memq t ops))
+    (flag-good-precedence (if (not (memq t ops))
 	ex
 	(begin (take-token s)
 	       (cond ((and space-sensitive spc (memq t unary-and-binary-ops)
@@ -498,7 +498,7 @@
 					       (ts:space? s)))
 			    `(macrocall @~ ,ex ,@args))))
 		     (else
-		      (list 'call t ex (parse-RtoL s down ops))))))))
+		      (list 'call t ex (parse-RtoL s down ops)))))))))
 
 (define (parse-cond s)
   (let ((ex (parse-or s)))
@@ -1607,13 +1607,57 @@
      ;; process escape sequences using lisp read
      (read (open-input-string (string #\" s #\"))))))
 
+; Within one atom, check for & and | that are okay and label them as such
+; Op-table groups 5-8 won't interact the same with | once its precedence changes
+; Op-table groups 5-10 are similarly troublesome for &
+; As atoms can contain nested atoms, we need to find the atoms which *only*
+; have acceptable calls within them - then swap them later
+(define bad-or (filter (lambda (op) (not (eq? op '|\||))) 
+  (append (prec-ops 5) (prec-ops 6) (prec-ops 7) (prec-ops 8))))
+(define bad-and (filter (lambda (op) (not (eq? op '&))) 
+  (append bad-or (list '|\||) (prec-ops 9) (prec-ops 10))))
+(define (contains-bad-ops op expr)
+  (let ((ops (if (eq? op '&) bad-and bad-or)))
+    (if (or (not (pair? expr)) (and (eq? (car expr) 'call) (eq? (cadr expr) op)))
+        #f ; only recursively look through sibling calls
+        (if (or (eq? (car expr) 'comparison) ; TODO: more calls like this?
+                (and (eq? (car expr) 'call) (memq (cadr expr) ops)))
+            #t
+            (or (contains-bad-ops op (car expr)) 
+                (contains-bad-ops op (cdr expr)))))))
+
+; Flag good expressions by renaming & and |
+(define (swap-precedence-symbol t)
+  (let ((swapped (memq t '(_precedence_or |\|| _precedence_or _precedence_and & _precedence_and))))
+    (and (pair? swapped) (cadr swapped))))
+
+(define (flag-good-precedence expr)
+  (let loop ((ex expr))
+    (if (not (pair? ex))
+        ex
+        (if (and (length> ex 3) (eq? (car ex) 'call) (memq (cadr ex) '(& |\||)))
+            (if (contains-bad-ops (cadr ex) expr)
+                ex
+                (append (list 'call (swap-precedence-symbol (cadr ex))) (cddr ex)))
+            (cons (loop (car ex)) (loop (cdr ex)))))))
+
+; Swap them so the obfuscated symbol is the one in deprecated locations
+(define (swap-precedence expr)
+  (if (not (pair? expr))
+      expr
+      (if (length> expr 3)
+          (if (and (eq? (car expr) 'call) (swap-precedence-symbol (cadr expr)))
+              (append (list 'call (swap-precedence-symbol (cadr expr))) (cddr expr))
+              (cons (swap-precedence (car expr)) (swap-precedence (cdr expr))))
+          (cons (swap-precedence (car expr)) (swap-precedence (cdr expr))))))
+
 ; parse numbers, identifiers, parenthesized expressions, lists, vectors, etc.
 (define (parse-atom s)
   (let ((ex (parse-atom- s)))
     (if (or (memq ex syntactic-operators)
 	    (eq? ex '....))
 	(error (string "invalid identifier name \"" ex "\"")))
-    ex))
+	(flag-good-precedence ex)))
 
 (define (parse-atom- s)
   (let ((t (require-token s)))
@@ -1829,5 +1873,5 @@
 	       (begin (take-token s) (skip-loop (peek-token s)))))
 	 (if (eof-object? (peek-token s))
 	     (eof-object)
-	     ((if (null? production) parse-stmts (car production))
-	      s)))))
+	     (swap-precedence ((if (null? production) parse-stmts (car production))
+	      s))))))
