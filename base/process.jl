@@ -506,7 +506,7 @@ end
 function pipeline_error(procs::ProcessChain)
     failed = Process[]
     for p = procs.processes
-        if !test_success(p) && !p.cmd.ignorestatus
+        if !success(p) && !p.cmd.ignorestatus
             push!(failed, p)
         end
     end
