@@ -318,6 +318,9 @@ function getindex(A::Range, I::AbstractVector{Bool})
     return [ A[i] for i in to_index(I) ]
 end
 
+function getindex(A::Array, ::Colon)
+    return [ a for a in A ]
+end
 
 # logical indexing
 # (when the indexing is provided as an Array{Bool} or a BitArray we can be
@@ -397,6 +400,7 @@ function setindex!{T<:Real}(A::Array, X::AbstractArray, I::AbstractVector{T})
     return A
 end
 
+setindex!(A::Array, x, I::Colon) = setindex!(A, x, 1:length(A))
 
 # logical indexing
 # (when the indexing is provided as an Array{Bool} or a BitArray we can be
