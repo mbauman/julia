@@ -435,3 +435,12 @@ export float32_isvalid, float64_isvalid
 
 @deprecate BigFloat(s::AbstractString) parse(BigFloat,s)
 @deprecate BigInt(s::AbstractString) parse(BigInt,s)
+
+_ensure_vector(A::AbstractArray) = vec(A)
+_ensure_vector(A) = A
+_ensure_vectors() = ()
+_ensure_vectors(A, As...) = (_ensure_vector(A), _ensure_vectors(As...)...)
+function _unsafe_setindex!(l::LinearIndexing, A::AbstractArray, x, J::Union(Real,AbstractArray,Colon)...)
+    depwarn("multidimensional indexed assignment with multidimensional arrays is deprecated, use vec to convert indices to vectors", :_unsafe_setindex!)
+    _unsafe_setindex!(l, A, x, _ensure_vectors(J...)...)
+end
