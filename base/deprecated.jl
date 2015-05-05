@@ -444,3 +444,8 @@ function _unsafe_setindex!(l::LinearIndexing, A::AbstractArray, x, J::Union(Real
     depwarn("multidimensional indexed assignment with multidimensional arrays is deprecated, use vec to convert indices to vectors", :_unsafe_setindex!)
     _unsafe_setindex!(l, A, x, _ensure_vectors(J...)...)
 end
+
+@deprecate (~)(x::Char)           Char(~UInt32(x))
+@deprecate (&)(x::Char, y::Char)  Char(UInt32(x) & UInt32(y))
+@deprecate (|)(x::Char, y::Char)  Char(UInt32(x) | UInt32(y))
+@deprecate ($)(x::Char, y::Char)  Char(UInt32(x) $ UInt32(y))
