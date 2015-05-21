@@ -466,3 +466,7 @@ end
 @deprecate is_valid_utf8(str)  isvalid(UTF8String, str)
 @deprecate is_valid_utf16(str) isvalid(UTF16String, str)
 @deprecate is_valid_utf32(str) isvalid(UTF32String, str)
+
+# 11379
+
+@deprecate utf32(c::Integer...)   UTF32String(UInt32[c...,0])
