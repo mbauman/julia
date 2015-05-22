@@ -4,10 +4,10 @@
 
 # notes: bits are stored in contiguous chunks
 #        unused bits must always be set to 0
-type BitArray{N} <: DenseArray{Bool, N}
+immutable BitArray{N,L,D} <: DenseArray{Bool, N}
     chunks::Vector{UInt64}
-    len::Int
-    dims::NTuple{N,Int}
+    len::L  # Int or Ref{Int} to allow for mutable-length BitVectors
+    dims::D # Void for BitVectors, NTuple{N,Int} for BitArrays
     function BitArray(dims::Int...)
         length(dims) == N || throw(ArgumentError("number of dimensions must be $N, got $(length(dims))"))
         n = 1
@@ -20,27 +20,36 @@ type BitArray{N} <: DenseArray{Bool, N}
         nc = num_bit_chunks(n)
         chunks = Array(UInt64, nc)
         nc > 0 && (chunks[end] = UInt64(0))
-        b = new(chunks, n)
-        N != 1 && (b.dims = dims)
+        if N == 1
+            b = new(chunks, Ref{Int}(n), nothing)
+        else
+            b = new(chunks, n, dims)
+        end
         return b
     end
+    BitArray(chunks::Vector{UInt64}, len::L, dims::D) = new(chunks, len, dims)
 end
 
-BitArray{N}(dims::NTuple{N,Int}) = BitArray{N}(dims...)
+BitArray(chunks::Vector{UInt64}, dims::NTuple{1,Int}) = BitArray{1,Ref{Int},Void}(chunks, Ref{Int}(dims[1]), nothing)
+BitArray{N}(chunks::Vector{UInt64}, dims::NTuple{N,Int}) = BitArray{N,Int,NTuple{N,Int}}(chunks, prod(dims), dims)
+BitArray(chunks::Vector{UInt64}, dims::Int...) = BitArray(chunks, dims)
+
+BitArray(dims::NTuple{1,Int}) = BitArray{1,Ref{Int},Void}(dims[1])
+BitArray{N}(dims::NTuple{N,Int}) = BitArray{N,Int,NTuple{N,Int}}(dims...)
 BitArray(dims::Int...) = BitArray(dims)
 
-typealias BitVector BitArray{1}
-typealias BitMatrix BitArray{2}
+typealias BitVector BitArray{1,Ref{Int},Void}
+typealias BitMatrix BitArray{2,Int,NTuple{2,Int}}
 
 ## utility functions ##
 
-length(B::BitArray) = B.len
-size(B::BitVector) = (B.len,)
+length(B::BitArray) = B.len[]
+size(B::BitVector) = (B.len[],)
 size(B::BitArray) = B.dims
 
 size(B::BitVector, d) = begin
     if d == 1
-        return B.len
+        return B.len[]
     elseif d > 1
         return 1
     end
@@ -280,11 +289,7 @@ function reshape{N}(B::BitArray, dims::NTuple{N,Int})
     prod(dims) == length(B) ||
         throw(DimensionMismatch("new dimensions $(dims) must be consistent with array size $(length(B))"))
     dims == size(B) && return B
-    Br = BitArray{N}(ntuple(N,i->0)...)
-    Br.chunks = B.chunks
-    Br.len = prod(dims)
-    N != 1 && (Br.dims = dims)
-    return Br
+    BitArray(B.chunks, dims)
 end
 
 ## Conversions ##
@@ -300,7 +305,9 @@ function convert{T,N}(::Type{Array{T,N}}, B::BitArray{N})
 end
 
 convert{T,N}(::Type{BitArray}, A::AbstractArray{T,N}) = convert(BitArray{N},A)
-function convert{T,N}(::Type{BitArray{N}}, A::AbstractArray{T,N})
+convert{T}(::Type{BitArray{1}}, A::AbstractArray{T,1}) = convert(BitArray{1,Ref{Int},Void},A)
+convert{T,N}(::Type{BitArray{N}}, A::AbstractArray{T,N}) = convert(BitArray{N,Int,NTuple{N,Int}},A)
+function convert{T,N,L,D}(::Type{BitArray{N,L,D}}, A::AbstractArray{T,N})
     B = BitArray(size(A))
     Bc = B.chunks
     l = length(B)
@@ -528,7 +535,7 @@ function push!(B::BitVector, item)
         ccall(:jl_array_grow_end, Void, (Any, UInt), Bc, 1)
         Bc[end] = UInt64(0)
     end
-    B.len += 1
+    B.len[] += 1
     if item
         B[end] = true
     end
@@ -548,7 +555,7 @@ function append!(B::BitVector, items::BitVector)
         ccall(:jl_array_grow_end, Void, (Any, UInt), Bc, k1 - k0)
         Bc[end] = UInt64(0)
     end
-    B.len += n1
+    B.len[] += n1
     copy_chunks!(Bc, n0+1, items.chunks, 1, n1)
     return B
 end
@@ -569,7 +576,7 @@ function prepend!(B::BitVector, items::BitVector)
         ccall(:jl_array_grow_end, Void, (Any, UInt), Bc, k1 - k0)
         Bc[end] = UInt64(0)
     end
-    B.len += n1
+    B.len[] += n1
     copy_chunks!(Bc, 1 + n1, Bc, 1, n0)
     copy_chunks!(Bc, 1, items.chunks, 1, n1)
     return B
@@ -598,7 +605,7 @@ function resize!(B::BitVector, n::Integer)
         ccall(:jl_array_grow_end, Void, (Any, UInt), Bc, k1 - k0)
         Bc[end] = UInt64(0)
     end
-    B.len = n
+    B.len[] = n
     return B
 end
 
@@ -609,7 +616,7 @@ function pop!(B::BitVector)
 
     l = _mod64(length(B))
     l == 1 && ccall(:jl_array_del_end, Void, (Any, UInt), B.chunks, 1)
-    B.len -= 1
+    B.len[] -= 1
 
     return item
 end
@@ -624,8 +631,8 @@ function unshift!(B::BitVector, item)
         ccall(:jl_array_grow_end, Void, (Any, UInt), Bc, 1)
         Bc[end] = UInt64(0)
     end
-    B.len += 1
-    if B.len == 1
+    B.len[] += 1
+    if B.len[] == 1
         Bc[1] = item
         return B
     end
@@ -653,7 +660,7 @@ function shift!(B::BitVector)
         else
             Bc[end] >>>= 1
         end
-        B.len -= 1
+        B.len[] -= 1
     end
 
     return item
@@ -673,7 +680,7 @@ function insert!(B::BitVector, i::Integer, item)
         ccall(:jl_array_grow_end, Void, (Any, UInt), Bc, 1)
         Bc[end] = UInt64(0)
     end
-    B.len += 1
+    B.len[] += 1
 
     for t = length(Bc) : -1 : k + 1
         Bc[t] = (Bc[t] << 1) | (Bc[t - 1] >>> 63)
@@ -715,7 +722,7 @@ function _deleteat!(B::BitVector, i::Integer)
         end
     end
 
-    B.len -= 1
+    B.len[] -= 1
 
     return B
 end
@@ -742,7 +749,7 @@ function deleteat!(B::BitVector, r::UnitRange{Int})
 
     delta_k < 0 && ccall(:jl_array_del_end, Void, (Any, UInt), Bc, -delta_k)
 
-    B.len = new_l
+    B.len[] = new_l
 
     if new_l > 0
         Bc[end] &= _msk_end(new_l)
@@ -780,7 +787,7 @@ function deleteat!(B::BitVector, inds)
     delta_k = num_bit_chunks(new_l) - length(Bc)
     delta_k < 0 && ccall(:jl_array_del_end, Void, (Any, UInt), Bc, -delta_k)
 
-    B.len = new_l
+    B.len[] = new_l
 
     if new_l > 0
         Bc[end] &= _msk_end(new_l)
@@ -832,7 +839,7 @@ function splice!(B::BitVector, r::Union(UnitRange{Int}, Integer), ins::AbstractA
 
     delta_k < 0 && ccall(:jl_array_del_end, Void, (Any, UInt), Bc, -delta_k)
 
-    B.len = new_l
+    B.len[] = new_l
 
     if new_l > 0
         Bc[end] &= _msk_end(new_l)
@@ -854,7 +861,7 @@ end
 
 function empty!(B::BitVector)
     ccall(:jl_array_del_end, Void, (Any, UInt), B.chunks, length(B.chunks))
-    B.len = 0
+    B.len[] = 0
     return B
 end
 
