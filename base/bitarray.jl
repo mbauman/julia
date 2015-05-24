@@ -6,7 +6,7 @@
 #        unused bits must always be set to 0
 immutable BitArray{N,L,D} <: DenseArray{Bool, N}
     chunks::Vector{UInt64}
-    len::L  # Int or Ref{Int} to allow for mutable-length BitVectors
+    len::L  # Int or RefValue{Int} to allow for mutable-length BitVectors
     dims::D # Void for BitVectors, NTuple{N,Int} for BitArrays
     function BitArray(dims::Int...)
         length(dims) == N || throw(ArgumentError("number of dimensions must be $N, got $(length(dims))"))
@@ -21,7 +21,7 @@ immutable BitArray{N,L,D} <: DenseArray{Bool, N}
         chunks = Array(UInt64, nc)
         nc > 0 && (chunks[end] = UInt64(0))
         if N == 1
-            b = new(chunks, Ref{Int}(n), nothing)
+            b = new(chunks, Ref(n), nothing)
         else
             b = new(chunks, n, dims)
         end
@@ -30,15 +30,15 @@ immutable BitArray{N,L,D} <: DenseArray{Bool, N}
     BitArray(chunks::Vector{UInt64}, len::L, dims::D) = new(chunks, len, dims)
 end
 
-BitArray(chunks::Vector{UInt64}, dims::NTuple{1,Int}) = BitArray{1,Ref{Int},Void}(chunks, Ref{Int}(dims[1]), nothing)
+BitArray(chunks::Vector{UInt64}, dims::NTuple{1,Int}) = BitArray{1,RefValue{Int},Void}(chunks, Ref(dims[1]), nothing)
 BitArray{N}(chunks::Vector{UInt64}, dims::NTuple{N,Int}) = BitArray{N,Int,NTuple{N,Int}}(chunks, prod(dims), dims)
 BitArray(chunks::Vector{UInt64}, dims::Int...) = BitArray(chunks, dims)
 
-BitArray(dims::NTuple{1,Int}) = BitArray{1,Ref{Int},Void}(dims[1])
+BitArray(dims::NTuple{1,Int}) = BitArray{1,RefValue{Int},Void}(dims[1])
 BitArray{N}(dims::NTuple{N,Int}) = BitArray{N,Int,NTuple{N,Int}}(dims...)
 BitArray(dims::Int...) = BitArray(dims)
 
-typealias BitVector BitArray{1,Ref{Int},Void}
+typealias BitVector BitArray{1,RefValue{Int},Void}
 typealias BitMatrix BitArray{2,Int,NTuple{2,Int}}
 
 ## utility functions ##
@@ -305,7 +305,7 @@ function convert{T,N}(::Type{Array{T,N}}, B::BitArray{N})
 end
 
 convert{T,N}(::Type{BitArray}, A::AbstractArray{T,N}) = convert(BitArray{N},A)
-convert{T}(::Type{BitArray{1}}, A::AbstractArray{T,1}) = convert(BitArray{1,Ref{Int},Void},A)
+convert{T}(::Type{BitArray{1}}, A::AbstractArray{T,1}) = convert(BitArray{1,RefValue{Int},Void},A)
 convert{T,N}(::Type{BitArray{N}}, A::AbstractArray{T,N}) = convert(BitArray{N,Int,NTuple{N,Int}},A)
 function convert{T,N,L,D}(::Type{BitArray{N,L,D}}, A::AbstractArray{T,N})
     B = BitArray(size(A))
