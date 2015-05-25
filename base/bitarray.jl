@@ -336,7 +336,10 @@ function convert{T,N,L,D}(::Type{BitArray{N,L,D}}, A::AbstractArray{T,N})
     return B
 end
 
+# TODO: should these return copies?
+convert(::Type{BitArray{1}}, B::BitArray{1}) = B
 convert{N}(::Type{BitArray{N}}, B::BitArray{N}) = B
+convert{N,L,D}(::Type{BitArray{N,L,D}}, B::BitArray{N,L,D}) = B
 convert{T,N}(::Type{AbstractArray{T,N}}, B::BitArray{N}) = convert(Array{T,N}, B)
 
 reinterpret{N}(::Type{Bool}, B::BitArray, dims::NTuple{N,Int}) = reinterpret(B, dims)
