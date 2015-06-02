@@ -544,7 +544,7 @@ end
         Osplat = Expr[:(to_index(I[$d]) == 1) for d = AN+1:N]
         quote
             $(Expr(:meta, :inline))
-            (&)($(Osplat...)) || throw(BoundsError(A, I))
+            (&)($(Osplat...)) || throw_boundserror(A, I)
             getindex(A, $(Isplat...))
         end
     else
@@ -558,8 +558,10 @@ end
         sz.args = Expr[:(size(A, $d)) for d=N:AN]
         quote
             $(Expr(:meta, :inline))
+            # ind2sub requires all dimensions to be nonzero, so checkbounds first
+            checkbounds(A, I...)
             s = ind2sub($sz, to_index(I[$N]))
-            getindex(A, $(Isplat...))
+            unsafe_getindex(A, $(Isplat...))
         end
     end
 end
@@ -634,7 +636,7 @@ end
         Osplat = Expr[:(to_index(I[$d]) == 1) for d = AN+1:N]
         quote
             $(Expr(:meta, :inline))
-            (&)($(Osplat...)) || throw(BoundsError(A, I))
+            (&)($(Osplat...)) || throw_boundserror(A, I)
             setindex!(A, v, $(Isplat...))
         end
     else
@@ -648,8 +650,9 @@ end
         sz.args = Expr[:(size(A, $d)) for d=N:AN]
         quote
             $(Expr(:meta, :inline))
+            checkbounds(A, I...)
             s = ind2sub($sz, to_index(I[$N]))
-            setindex!(A, v, $(Isplat...))
+            unsafe_setindex!(A, v, $(Isplat...))
         end
     end
 end
