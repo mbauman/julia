@@ -387,6 +387,8 @@ struct jl_varinfo_t {
 
 // --- helpers for reloading IR image
 static void jl_gen_llvm_gv_array(llvm::Module *mod, SmallVector<GlobalVariable*, 8> &globalvars);
+static void jl_sysimg_to_llvm(llvm::Module *mod, SmallVector<GlobalVariable*, 8> &globalvars,
+                              const char *sysimg_data, size_t sysimg_len);
 
 extern "C"
 void jl_dump_bitcode(char *fname)
@@ -416,7 +418,7 @@ void jl_dump_bitcode(char *fname)
 }
 
 extern "C"
-void jl_dump_objfile(char *fname, int jit_model)
+void jl_dump_objfile(char *fname, int jit_model, const char *sysimg_data, size_t sysimg_len)
 {
 #ifdef LLVM36
     std::error_code err;
@@ -487,9 +489,13 @@ void jl_dump_objfile(char *fname, int jit_model)
 
     SmallVector<GlobalVariable*, 8> globalvars;
 #ifdef USE_MCJIT
+    if (sysimg_data)
+        jl_sysimg_to_llvm(shadow_module, globalvars, sysimg_data, sysimg_len);
     jl_gen_llvm_gv_array(shadow_module, globalvars);
     PM.run(*shadow_module);
 #else
+    if (sysimg_data)
+        jl_sysimg_to_llvm(jl_Module, globalvars, sysimg_data, sysimg_len);
     jl_gen_llvm_gv_array(jl_Module, globalvars);
     PM.run(*jl_Module);
 #endif
@@ -3220,7 +3226,11 @@ static Value *emit_expr(jl_value_t *expr, jl_codectx_t *ctx, bool isboxed,
                     builder.CreateLoad(prepare_global(jlexc_var), true)),
                 resetstkoflw_blk, handlr);
         builder.SetInsertPoint(resetstkoflw_blk);
-        builder.CreateCall(prepare_call(resetstkoflw_func));
+        builder.CreateCall(prepare_call(resetstkoflw_func)
+#                          ifdef LLVM37
+                           , {}
+#                          endif
+                           );
         builder.CreateBr(handlr);
 #else
         builder.CreateCondBr(isz, tryblk, handlr);
@@ -5521,7 +5531,9 @@ extern "C" void jl_init_codegen(void)
 #if defined(JL_DEBUG_BUILD) && !defined(LLVM37)
     options.JITEmitDebugInfo = true;
 #endif
+#ifndef LLVM37
     options.NoFramePointerElim = true;
+#endif
 #ifndef LLVM34
     options.NoFramePointerElimNonLeaf = true;
 #endif

@@ -352,7 +352,7 @@ function valid_tparam(x::ANY)
 end
 
 function extract_simple_tparam(Ai)
-    if isa(Ai,Int) || isa(Ai,Bool)
+    if !isa(Ai,Symbol) && valid_tparam(Ai)
         return Ai
     elseif isa(Ai,QuoteNode) && valid_tparam(Ai.value)
         return Ai.value
@@ -371,6 +371,8 @@ function extract_simple_tparam(Ai)
     return Bottom
 end
 
+has_typevars(t::ANY) = ccall(:jl_has_typevars, Cint, (Any,), t)!=0
+
 # TODO: handle e.g. apply_type(T, R::Union(Type{Int32},Type{Float64}))
 const apply_type_tfunc = function (A, args...)
     if !isType(args[1])
@@ -387,8 +389,9 @@ const apply_type_tfunc = function (A, args...)
     for i=2:max(lA,length(args))
         ai = args[i]
         if isType(ai)
-            uncertain |= (!isleaftype(ai))
-            tparams = svec(tparams..., ai.parameters[1])
+            aip1 = ai.parameters[1]
+            uncertain |= has_typevars(aip1)
+            tparams = svec(tparams..., aip1)
         else
             if i<=lA
                 val = extract_simple_tparam(A[i])
@@ -599,7 +602,8 @@ let stagedcache=Dict{Any,Any}()
                 # don't call staged functions on abstract types.
                 # (see issues #8504, #10230)
                 # we can't guarantee that their type behavior is monotonic.
-                error()
+                error("cannot call @generated function `", m.func.code.name, "` ",
+                      "with abstract argument types: ", tt)
             end
             f = ccall(:jl_instantiate_staged,Any,(Any,Any,Any),m,tt,env)
             stagedcache[(m,tt,env)] = f
@@ -619,10 +623,12 @@ function abstract_call_gf(f, fargs, argtype, e)
             return getfield_tfunc(fargs, argtypes[1], argtypes[2])[1]
         elseif istopfunction(tm, f, :next)
             isa(e,Expr) && (e.head = :call1)
-            return Tuple{getfield_tfunc(fargs, argtypes[1], argtypes[2])[1], Int}
+            t1 = getfield_tfunc(fargs, argtypes[1], argtypes[2])[1]
+            return t1===Bottom ? Bottom : Tuple{t1, Int}
         elseif istopfunction(tm, f, :indexed_next)
             isa(e,Expr) && (e.head = :call1)
-            return Tuple{getfield_tfunc(fargs, argtypes[1], argtypes[2])[1], Int}
+            t1 = getfield_tfunc(fargs, argtypes[1], argtypes[2])[1]
+            return t1===Bottom ? Bottom : Tuple{t1, Int}
         end
     end
     if istopfunction(tm, f, :promote_type) || istopfunction(tm, f, :typejoin)
@@ -738,26 +744,18 @@ function invoke_tfunc(f, types, argtype)
     if is(argtype,Bottom)
         return Bottom
     end
-    applicable = _methods(f, types, -1)
-    if isempty(applicable)
-        return Any
-    end
-    for (m::SimpleVector) in applicable
-        local linfo
-        try
-            linfo = func_for_method(m[3],types,m[2])
-        catch
+    try
+        meth = ccall(:jl_gf_invoke_lookup, Any, (Any, Any), f, types)
+        if is(meth, nothing)
             return Any
         end
-        if typeseq(m[1],types)
-            tvars = m[2][1:2:end]
-            (ti, env) = ccall(:jl_match_method, Any, (Any,Any,Any),
-                              argtype, m[1], tvars)::SimpleVector
-            (_tree,rt) = typeinf(linfo, ti, env, linfo)
-            return rt
-        end
+        (ti, env) = ccall(:jl_match_method, Any, (Any, Any, Any),
+                          argtype, meth.sig, meth.tvars)::SimpleVector
+        linfo = func_for_method(meth, types, env)
+        return typeinf(linfo, ti, env, linfo)[2]
+    catch
+        return Any
     end
-    return Any
 end
 
 # `types` is an array of inferred types for expressions in `args`.
@@ -1874,7 +1872,7 @@ function type_annotate(ast::Expr, states::Array{Any,1}, sv::ANY, rettype::ANY, a
             # builtins.c:jl_trampoline. However if jl_trampoline is changed then
             # this code will need to be restored.
             #na = length(a.args[1])
-            #li.ast, _ = typeinf(li, ntuple(na+1, i->(i>na ? (Tuple)[1] : Any)),
+            #li.ast, _ = typeinf(li, ntuple(i->(i>na ? (Tuple)[1] : Any), na+1),
             #                    li.sparams, li, false)
         end
     end

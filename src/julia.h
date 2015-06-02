@@ -904,7 +904,7 @@ DLLEXPORT uptrint_t jl_object_id(jl_value_t *v);
 // type predicates and basic operations
 int jl_is_type(jl_value_t *v);
 DLLEXPORT int jl_is_leaf_type(jl_value_t *v);
-int jl_has_typevars(jl_value_t *v);
+DLLEXPORT int jl_has_typevars(jl_value_t *v);
 DLLEXPORT int jl_subtype(jl_value_t *a, jl_value_t *b, int ta);
 int jl_type_morespecific(jl_value_t *a, jl_value_t *b);
 DLLEXPORT int jl_types_equal(jl_value_t *a, jl_value_t *b);
@@ -1173,8 +1173,10 @@ DLLEXPORT void jl_atexit_hook(void);
 DLLEXPORT void NORETURN jl_exit(int status);
 
 DLLEXPORT void jl_preload_sysimg_so(const char *fname);
+DLLEXPORT ios_t *jl_create_system_image();
 DLLEXPORT void jl_save_system_image(const char *fname);
 DLLEXPORT void jl_restore_system_image(const char *fname);
+DLLEXPORT void jl_restore_system_image_data(const char *buf, size_t len);
 DLLEXPORT int jl_save_new_module(const char *fname, jl_module_t *mod);
 DLLEXPORT jl_module_t *jl_restore_new_module(const char *fname);
 void jl_init_restored_modules();
@@ -1325,9 +1327,10 @@ DLLEXPORT extern volatile sig_atomic_t jl_defer_signal;
 
 DLLEXPORT void jl_sigint_action(void);
 DLLEXPORT void restore_signals(void);
-DLLEXPORT void jl_install_sigint_handler();
+DLLEXPORT void jl_install_sigint_handler(void);
 DLLEXPORT void jl_sigatomic_begin(void);
 DLLEXPORT void jl_sigatomic_end(void);
+void jl_install_default_signal_handlers(void);
 
 
 // tasks and exceptions -------------------------------------------------------
@@ -1553,6 +1556,7 @@ typedef struct {
     int8_t fast_math;
     int8_t worker;
     const char *bindto;
+    int8_t handle_signals;
 } jl_options_t;
 
 extern DLLEXPORT jl_options_t jl_options;
@@ -1587,6 +1591,9 @@ extern DLLEXPORT jl_options_t jl_options;
 #define JL_OPTIONS_FAST_MATH_ON 1
 #define JL_OPTIONS_FAST_MATH_OFF 2
 #define JL_OPTIONS_FAST_MATH_DEFAULT 0
+
+#define JL_OPTIONS_HANDLE_SIGNALS_ON 1
+#define JL_OPTIONS_HANDLE_SIGNALS_OFF 0
 
 // Version information
 #include "julia_version.h"

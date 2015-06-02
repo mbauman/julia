@@ -421,7 +421,7 @@ JL_CALLABLE(jl_f_apply)
         else if (jl_is_tuple(args[i])) {
             n += jl_nfields(args[i]);
         }
-        else if (jl_typeis(args[i], jl_array_any_type)) {
+        else if (jl_is_array(args[i]) && ((jl_array_t*)args[i])->ptrarray) {
             n += jl_array_len(args[i]);
         }
         else {
@@ -620,7 +620,7 @@ JL_CALLABLE(jl_f_tuple)
     if (nargs == 0) return (jl_value_t*)jl_emptytuple;
     jl_datatype_t *tt;
     if (nargs < jl_page_size/sizeof(jl_value_t*)) {
-        jl_value_t **types = alloca(nargs*sizeof(jl_value_t*));
+        jl_value_t **types = (jl_value_t**)alloca(nargs*sizeof(jl_value_t*));
         for(i=0; i < nargs; i++)
             types[i] = jl_typeof(args[i]);
         tt = jl_inst_concrete_tupletype_v(types, nargs);

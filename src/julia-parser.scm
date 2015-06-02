@@ -70,6 +70,11 @@
 (define syntactic-op? (Set syntactic-operators))
 (define syntactic-unary-op? (Set syntactic-unary-operators))
 
+(define (symbol-or-interpolate? ex)
+  (or (symbol? ex)
+      (and (pair? ex)
+           (eq? '$ (car ex)))))
+
 (define trans-op (string->symbol ".'"))
 (define ctrans-op (string->symbol "'"))
 (define vararg-op (string->symbol "..."))
@@ -916,7 +921,8 @@
   (let ((op (peek-token s)))
     (if (syntactic-unary-op? op)
         (begin (take-token s)
-               (cond ((closing-token? (peek-token s))  op)
+               (cond ((let ((next (peek-token s)))
+                        (or (closing-token? next) (newline? next))) op)
                      ((memq op '(& |::|))  (list op (parse-call s)))
                      (else                 (list op (parse-unary-prefix s)))))
         (parse-atom s))))
@@ -1245,8 +1251,8 @@
                  body))))
     ((export)
      (let ((es (map macrocall-to-atsym
-                    (parse-comma-separated s parse-atom))))
-       (if (not (every symbol? es))
+                    (parse-comma-separated s parse-unary-prefix))))
+       (if (not (every symbol-or-interpolate? es))
            (error "invalid \"export\" statement"))
        `(export ,@es)))
     ((import using importall)
@@ -1298,9 +1304,9 @@
          (from  (and (eq? next ':) (not (ts:space? s))))
          (done  (cond ((or from (eqv? next #\,))
                        (begin (take-token s) #f))
-                      ((memv next '(#\newline #\;)) #t)
-                      ((eof-object? next) #t)
-                      (else #f)))
+                      ((or (eq? next '|.|)
+                           (eqv? (string.sub (string next) 0 1) ".")) #f)
+                      (else #t)))
          (rest  (if done
                     '()
                     (parse-comma-separated s (lambda (s)
@@ -1327,17 +1333,17 @@
            (begin (take-token s)
                   (loop (list* '|.| '|.| '|.| '|.| l) (peek-token s))))
           (else
-           (cons (macrocall-to-atsym (parse-atom s)) l)))))
+           (cons (macrocall-to-atsym (parse-unary-prefix s)) l)))))
 
 (define (parse-import s word)
   (let loop ((path (parse-import-dots s)))
-    (if (not (symbol? (car path)))
+    (if (not (symbol-or-interpolate? (car path)))
         (error (string "invalid \"" word "\" statement: expected identifier")))
     (let ((nxt (peek-token s)))
       (cond
        ((eq? nxt '|.|)
         (take-token s)
-        (loop (cons (macrocall-to-atsym (parse-atom s)) path)))
+        (loop (cons (macrocall-to-atsym (parse-unary-prefix s)) path)))
        ((or (memv nxt '(#\newline #\; #\, :))
             (eof-object? nxt))
         `(,word ,@(reverse path)))
@@ -1346,7 +1352,7 @@
         (loop (cons (symbol (string.sub (string nxt) 1))
                     path)))
        (else
-        (error (string "invalid \"" word "\" statement")))))))
+        `(,word ,@(reverse path)))))))
 
 ; parse comma-separated assignments, like "i=1:n,j=1:m,..."
 (define (parse-comma-separated s what)

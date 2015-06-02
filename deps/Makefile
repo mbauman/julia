@@ -736,44 +736,44 @@ install-libuv: $(UV_OBJ_TARGET)
 
 ## PCRE ##
 
-PCRE_SRC_TARGET = pcre-$(PCRE_VER)/.libs/libpcre.$(SHLIB_EXT)
-PCRE_OBJ_TARGET = $(build_shlibdir)/libpcre.$(SHLIB_EXT)
+PCRE_SRC_TARGET = pcre2-$(PCRE_VER)/.libs/libpcre2-8.$(SHLIB_EXT)
+PCRE_OBJ_TARGET = $(build_shlibdir)/libpcre2-8.$(SHLIB_EXT)
 
-pcre-$(PCRE_VER).tar.bz2:
-	$(JLDOWNLOAD) $@ http://sourceforge.net/projects/pcre/files/pcre/$(PCRE_VER)/$@/download
-pcre-$(PCRE_VER)/configure: pcre-$(PCRE_VER).tar.bz2
+pcre2-$(PCRE_VER).tar.bz2:
+	$(JLDOWNLOAD) $@ http://sourceforge.net/projects/pcre/files/pcre2/$(PCRE_VER)/$@/download
+pcre2-$(PCRE_VER)/configure: pcre2-$(PCRE_VER).tar.bz2
 	$(JLCHECKSUM) $<
 	$(TAR) jxf $<
 	touch -c $@
-pcre-$(PCRE_VER)/config.status: pcre-$(PCRE_VER)/configure
-	cd pcre-$(PCRE_VER) && \
-	./configure $(CONFIGURE_COMMON) --enable-utf --enable-unicode-properties --enable-jit --includedir=$(build_includedir)
+pcre2-$(PCRE_VER)/config.status: pcre2-$(PCRE_VER)/configure
+	cd pcre2-$(PCRE_VER) && \
+	./configure $(CONFIGURE_COMMON) --enable-jit --includedir=$(build_includedir)
 	touch -c $@
-$(PCRE_SRC_TARGET): pcre-$(PCRE_VER)/config.status
-	$(MAKE) -C pcre-$(PCRE_VER) $(LIBTOOL_CCLD)
+$(PCRE_SRC_TARGET): pcre2-$(PCRE_VER)/config.status
+	$(MAKE) -C pcre2-$(PCRE_VER) $(LIBTOOL_CCLD)
 	touch -c $@
-pcre-$(PCRE_VER)/checked: $(PCRE_SRC_TARGET)
+pcre2-$(PCRE_VER)/checked: $(PCRE_SRC_TARGET)
 ifeq ($(OS),$(BUILD_OS))
 ifneq ($(OS),WINNT)
-	$(MAKE) -C pcre-$(PCRE_VER) check -j1
+	$(MAKE) -C pcre2-$(PCRE_VER) check -j1
 endif
 endif
 	echo 1 > $@
-$(PCRE_OBJ_TARGET): $(PCRE_SRC_TARGET) pcre-$(PCRE_VER)/checked
-	$(call make-install,pcre-$(PCRE_VER),$(LIBTOOL_CCLD))
-	$(INSTALL_NAME_CMD)libpcre.$(SHLIB_EXT) $@
+$(PCRE_OBJ_TARGET): $(PCRE_SRC_TARGET) pcre2-$(PCRE_VER)/checked
+	$(call make-install,pcre2-$(PCRE_VER),$(LIBTOOL_CCLD))
+	$(INSTALL_NAME_CMD)libpcre2-8.$(SHLIB_EXT) $@
 	touch -c $@
 
 clean-pcre:
-	-$(MAKE) -C pcre-$(PCRE_VER) clean
+	-$(MAKE) -C pcre2-$(PCRE_VER) clean
 	-rm -f $(build_shlibdir)/libpcre*
 distclean-pcre: clean-pcre
-	-rm -rf pcre-$(PCRE_VER).tar.bz2 pcre-$(PCRE_VER)
+	-rm -rf pcre2-$(PCRE_VER).tar.bz2 pcre2-$(PCRE_VER)
 
-get-pcre: pcre-$(PCRE_VER).tar.bz2
-configure-pcre: pcre-$(PCRE_VER)/config.status
+get-pcre: pcre2-$(PCRE_VER).tar.bz2
+configure-pcre: pcre2-$(PCRE_VER)/config.status
 compile-pcre: $(PCRE_SRC_TARGET)
-check-pcre: pcre-$(PCRE_VER)/checked
+check-pcre: pcre2-$(PCRE_VER)/checked
 install-pcre: $(PCRE_OBJ_TARGET)
 
 
@@ -1128,7 +1128,7 @@ endif
 
 libgfortblas.$(SHLIB_EXT): gfortblas.c gfortblas.alias
 	$(CC) -Wall -O3 $(CPPFLAGS) $(CFLAGS) $(fPIC) -shared $< -o $@ -pipe \
-				-Wl,-reexport_framework,vecLib -Wl,-alias_list,gfortblas.alias
+				-Wl,-reexport_framework,Accelerate -Wl,-alias_list,gfortblas.alias
 $(build_shlibdir)/libgfortblas.$(SHLIB_EXT): libgfortblas.$(SHLIB_EXT)
 	cp -f $< $@
 	$(INSTALL_NAME_CMD)libgfortblas.$(SHLIB_EXT) $@
@@ -1436,7 +1436,7 @@ UTF8PROC_OBJ_HEADER = $(build_includedir)/utf8proc.h
 UTF8PROC_OBJ_TARGET = $(UTF8PROC_OBJ_LIB) $(UTF8PROC_OBJ_HEADER)
 
 $(UTF8PROC_SRC_TARGET): $(UTF8PROC_SRC_DIR)/Makefile
-	$(MAKE) -C $(UTF8PROC_SRC_DIR) cc="$(CC) -O2 -std=c99 $(fPIC) -DUTF8PROC_EXPORTS $(DEPS_CFLAGS)" AR="$(AR)" libutf8proc.a
+	$(MAKE) -C $(UTF8PROC_SRC_DIR) CC="$(CC)" CFLAGS="-O2 -std=c99 $(fPIC) -DUTF8PROC_EXPORTS $(DEPS_CFLAGS)" AR="$(AR)" libutf8proc.a
 	touch -c $@
 $(UTF8PROC_SRC_DIR)/checked: $(UTF8PROC_SRC_TARGET)
 ifeq ($(OS),$(BUILD_OS))
@@ -1869,7 +1869,11 @@ install-virtualenv: $(VIRTUALENV_TARGET)
 
 ## libgit2
 
-LIBGIT2_OBJ_SOURCE = libgit2-$(LIBGIT2_VER)/build/libgit2.$(SHLIB_EXT)
+LIBGIT2_GIT_URL = git://github.com/libgit2/libgit2.git
+LIBGIT2_TAR_URL = https://api.github.com/repos/libgit2/libgit2/tarball/$1
+$(eval $(call git-external,libgit2,LIBGIT2,CMakeLists.txt,build/libgit2.$(SHLIB_EXT)))
+
+LIBGIT2_OBJ_SOURCE = $(LIBGIT2_SRC_DIR)/build/libgit2.$(SHLIB_EXT)
 LIBGIT2_OBJ_TARGET = $(build_shlibdir)/libgit2.$(SHLIB_EXT)
 
 LIBGIT2_OPTS = $(CMAKE_COMMON) -DTHREADSAFE=ON
@@ -1883,28 +1887,22 @@ LIBGIT2_OPTS += -DCMAKE_FIND_ROOT_PATH=/usr/$(XC_HOST) -DCMAKE_FIND_ROOT_PATH_MO
 endif
 endif
 
-libgit2-$(LIBGIT2_VER).tar.gz:
-	$(JLDOWNLOAD) $@ https://github.com/libgit2/libgit2/archive/v$(LIBGIT2_VER).tar.gz
-libgit2-$(LIBGIT2_VER)/CMakeLists.txt: libgit2-$(LIBGIT2_VER).tar.gz
-	$(JLCHECKSUM) $<
-	$(TAR) zxf $<
-	touch -c $@
-libgit2-$(LIBGIT2_VER)/build/Makefile: libgit2-$(LIBGIT2_VER)/CMakeLists.txt
-	mkdir -p libgit2-$(LIBGIT2_VER)/build
-	cd libgit2-$(LIBGIT2_VER)/build/ && \
+$(LIBGIT2_SRC_DIR)/build/Makefile: $(LIBGIT2_SRC_DIR)/CMakeLists.txt
+	mkdir -p $(LIBGIT2_SRC_DIR)/build
+	cd $(LIBGIT2_SRC_DIR)/build/ && \
 	$(CMAKE) .. $(LIBGIT2_OPTS)
 	touch -c $@
-$(LIBGIT2_OBJ_SOURCE): libgit2-$(LIBGIT2_VER)/build/Makefile
-	$(MAKE) -C libgit2-$(LIBGIT2_VER)/build
+$(LIBGIT2_OBJ_SOURCE): $(LIBGIT2_SRC_DIR)/build/Makefile
+	$(MAKE) -C $(LIBGIT2_SRC_DIR)/build
 	touch -c $@
-libgit2-$(LIBGIT2_VER)/build/checked: $(LIBGIT2_OBJ_SOURCE)
+$(LIBGIT2_SRC_DIR)/build/checked: $(LIBGIT2_OBJ_SOURCE)
 ifeq ($(OS),$(BUILD_OS))
-	$(MAKE) -C libgit2-$(LIBGIT2_VER)/build test
+	$(MAKE) -C $(LIBGIT2_SRC_DIR)/build test
 endif
 	echo 1 > $@
 $(LIBGIT2_OBJ_TARGET): $(LIBGIT2_OBJ_SOURCE) | $(build_shlibdir)
 	cp $< $@
-	#$$(call make-install,libgit2-$(LIBGIT2_VER)/build,)
+	#$$(call make-install,$(LIBGIT2_SRC_DIR)/build,)
 ifeq ($(OS),Linux)
 	# If we're on linux, copy over libssl and libcrypto for libgit2
 	-LIBGIT_LIBS=$$(ldd "$@" | tail -n +2 | awk '{print $$(NF-1)}'); \
@@ -1917,15 +1915,13 @@ endif
 	touch -c $@
 
 clean-libgit2:
-	-rm -rf libgit2-$(LIBGIT2_VER)/build/
+	-rm -rf $(LIBGIT2_SRC_DIR)/build/
 	-rm -f $(LIBGIT2_OBJ_TARGET)
-distclean-libgit2:
-	-rm -rf libgit2-$(LIBGIT2_VER).tar.gz libgit2-$(LIBGIT2_VER).zip libgit2-$(LIBGIT2_VER)
 
-get-libgit2: libgit2-$(LIBGIT2_VER).tar.gz
-configure-libgit2: libgit2-$(LIBGIT2_VER)/build/Makefile
+get-libgit2: $(LIBGIT2_SRC_DIR)/CMakeLists.txt
+configure-libgit2: $(LIBGIT2_SRC_DIR)/build/Makefile
 compile-libgit2: $(LIBGIT2_OBJ_SOURCE)
-check-libgit2: libgit2-$(LIBGIT2_VER)/build/checked
+check-libgit2: $(LIBGIT2_SRC_DIR)/build/checked
 install-libgit2: $(LIBGIT2_OBJ_TARGET)
 
 ## phony targets ##

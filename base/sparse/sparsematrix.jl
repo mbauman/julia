@@ -183,7 +183,9 @@ convert{T}(::Type{AbstractMatrix{T}}, A::SparseMatrixCSC) = convert(SparseMatrix
 convert(::Type{Matrix}, S::SparseMatrixCSC) = full(S)
 
 function full{Tv}(S::SparseMatrixCSC{Tv})
-    A = zeros(Tv, S.m, S.n)
+    # Handle cases where zero(Tv) is not defined but the array is dense.
+    # (Should we really worry about this?)
+    A = length(S) == nnz(S) ? Array(Tv, S.m, S.n) : zeros(Tv, S.m, S.n)
     for col = 1 : S.n, k = S.colptr[col] : (S.colptr[col+1]-1)
         A[S.rowval[k], col] = S.nzval[k]
     end
@@ -1640,7 +1642,11 @@ function getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractArray{Bool})
 end
 
 function getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractArray)
-    szA = size(A); colptrA = A.colptr; rowvalA = A.rowval; nzvalA = A.nzval
+    szA = size(A)
+    nA = szA[1]*szA[2]
+    colptrA = A.colptr
+    rowvalA = A.rowval
+    nzvalA = A.nzval
 
     n = length(I)
     outm = size(I,1)
@@ -1656,6 +1662,7 @@ function getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractArray)
     idxB = 1
 
     for i in 1:n
+        ((I[i] < 1) | (I[i] > nA)) && throw(BoundsError())
         row,col = ind2sub(szA, I[i])
         for r in colptrA[col]:(colptrA[col+1]-1)
             @inbounds if rowvalA[r] == row
@@ -2386,17 +2393,41 @@ end
 squeeze(S::SparseMatrixCSC, dims::Dims) = throw(ArgumentError("squeeze is not available for sparse matrices"))
 
 ## Structure query functions
+issym(A::SparseMatrixCSC) = is_hermsym(A, IdFun())
 
-function issym(A::SparseMatrixCSC)
+ishermitian(A::SparseMatrixCSC) = is_hermsym(A, ConjFun())
+
+function is_hermsym(A::SparseMatrixCSC, check::Func)
     m, n = size(A)
     if m != n; return false; end
-    return countnz(A - A.') == 0
-end
 
-function ishermitian(A::SparseMatrixCSC)
-    m, n = size(A)
-    if m != n; return false; end
-    return countnz(A - A') == 0
+    colptr = A.colptr
+    rowval = A.rowval
+    nzval = A.nzval
+    tracker = copy(A.colptr)
+    @inbounds for col = 1:A.n
+        for p = tracker[col]:colptr[col+1]-1
+            val = nzval[p]
+            if val == 0; continue; end # In case of explicit zeros
+            row = rowval[p]
+            if row < col; return false; end
+            if row == col # Diagonal element
+                if val != check(val)
+                    return false
+                end
+            else
+                row2 = rowval[tracker[row]]
+                if row2 > col; return false; end
+                if row2 == col # A[i,j] and A[j,i] exists
+                    if val != check(nzval[tracker[row]])
+                        return false
+                    end
+                    tracker[row] += 1
+                end
+            end
+        end
+    end
+    return true
 end
 
 function istriu{Tv}(A::SparseMatrixCSC{Tv})
