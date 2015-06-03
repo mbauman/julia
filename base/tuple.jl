@@ -28,9 +28,17 @@ length{N}(::Type{NTuple{N}}) = N
 isempty(::Type{Tuple{}}) = true
 isempty{N}(::Type{NTuple{N}}) = false
 
-start{N}(T::Type{NTuple{N}}) = start(T.parameters)
-next{N}(T::Type{NTuple{N}}, i) = next(T.parameters, i)
-done{N}(T::Type{NTuple{N}}, i) = done(T.parameters, i)
+start{N}(T::Type{NTuple{N}}) = 1
+function next{N}(T::Type{NTuple{N}}, i)
+    last = T.parameters[end]
+    if i >= length(T.parameters) && last <: Vararg
+        (last.parameters[1],i+1)
+    else
+        (T.parameters[i],i+1)
+    end
+end
+done{N}(T::Type{NTuple{N}}, i) = i > N
+
 start(::Type{Tuple{}}) = 1
 next(T::Type{Tuple{}}, i) = throw(BoundsError(T, i))
 done(::Type{Tuple{}}, i) = true
