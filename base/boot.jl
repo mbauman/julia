@@ -136,7 +136,7 @@ export
     # errors
     BoundsError, DivideError, DomainError, Exception,
     InexactError, InterruptException, OutOfMemoryError, OverflowError,
-    StackOverflowError, UndefRefError, UndefVarError,
+    StackOverflowError, SegmentationFault, UndefRefError, UndefVarError,
     # AST representation
     Expr, GotoNode, LabelNode, LineNumberNode, QuoteNode, SymbolNode, TopNode,
     GlobalRef, NewvarNode, GenSym,
@@ -218,6 +218,7 @@ immutable DomainError        <: Exception end
 immutable OverflowError      <: Exception end
 immutable InexactError       <: Exception end
 immutable OutOfMemoryError   <: Exception end
+immutable SegmentationFault  <: Exception end
 immutable StackOverflowError <: Exception end
 immutable UndefRefError      <: Exception end
 immutable UndefVarError      <: Exception
@@ -296,3 +297,5 @@ convert(::Type{Any}, x::ANY) = x
 convert{T}(::Type{T}, x::T) = x
 cconvert(T::Type, x) = convert(T, x)
 unsafe_convert{T}(::Type{T}, x::T) = x
+
+ccall(:jl_set_istopmod, Void, (Bool,), true)

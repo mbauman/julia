@@ -66,7 +66,11 @@ strides{T}(a::Array{T,1}) = (1,)
 strides{T}(a::Array{T,2}) = (1, size(a,1))
 strides{T}(a::Array{T,3}) = (1, size(a,1), size(a,1)*size(a,2))
 
-isassigned(a::Array, i::Int...) = isdefined(a, i...)
+function isassigned{T}(a::Array{T}, i::Int...)
+    ii = sub2ind(size(a), i...)
+    1 <= ii <= length(a) || return false
+    ccall(:jl_array_isassigned, Cint, (Any, UInt), a, ii-1) == 1
+end
 
 ## copy ##
 
@@ -206,10 +210,11 @@ end
 function fill!{T<:Union(Integer,FloatingPoint)}(a::Array{T}, x)
     # note: checking bit pattern
     xT = convert(T,x)
-    if isbits(T) && ((sizeof(T)==1 && reinterpret(UInt8, xT) == 0) ||
-                     (sizeof(T)==2 && reinterpret(UInt16, xT) == 0) ||
-                     (sizeof(T)==4 && reinterpret(UInt32, xT) == 0) ||
-                     (sizeof(T)==8 && reinterpret(UInt64, xT) == 0))
+    if isbits(T) && nfields(T)==0 &&
+        ((sizeof(T)==1 && reinterpret(UInt8, xT) == 0) ||
+         (sizeof(T)==2 && reinterpret(UInt16, xT) == 0) ||
+         (sizeof(T)==4 && reinterpret(UInt32, xT) == 0) ||
+         (sizeof(T)==8 && reinterpret(UInt64, xT) == 0))
         ccall(:memset, Ptr{Void}, (Ptr{Void}, Cint, Csize_t),
               a, 0, length(a)*sizeof(T))
     else
@@ -749,7 +754,6 @@ end
 
 promote_array_type{Scalar, Arry}(::Type{Scalar}, ::Type{Arry}) = promote_type(Scalar, Arry)
 promote_array_type{S<:Real, A<:FloatingPoint}(::Type{S}, ::Type{A}) = A
-promote_array_type{S<:Union(Complex, Real), AT<:FloatingPoint}(::Type{S}, ::Type{Complex{AT}}) = Complex{AT}
 promote_array_type{S<:Integer, A<:Integer}(::Type{S}, ::Type{A}) = A
 promote_array_type{S<:Integer}(::Type{S}, ::Type{Bool}) = S
 
@@ -863,33 +867,6 @@ for f in (:+, :-)
             return F
         end
     end
-end
-
-## promotion to complex ##
-
-function complex{S<:Real,T<:Real}(A::Array{S}, B::Array{T})
-    if size(A) != size(B); throw(DimensionMismatch()); end
-    F = similar(A, typeof(complex(zero(S),zero(T))))
-    for i in eachindex(A)
-        @inbounds F[i] = complex(A[i], B[i])
-    end
-    return F
-end
-
-function complex{T<:Real}(A::Real, B::Array{T})
-    F = similar(B, typeof(complex(A,zero(T))))
-    for i in eachindex(B)
-        @inbounds F[i] = complex(A, B[i])
-    end
-    return F
-end
-
-function complex{T<:Real}(A::Array{T}, B::Real)
-    F = similar(A, typeof(complex(zero(T),B)))
-    for i in eachindex(A)
-        @inbounds F[i] = complex(A[i], B)
-    end
-    return F
 end
 
 # use memcmp for lexcmp on byte arrays
@@ -1301,8 +1278,8 @@ function indcopy(sz::Dims, I::Tuple{Vararg{RangeIndex}})
     for i = n+1:length(sz)
         s *= sz[i]
     end
-    dst::typeof(I) = ntuple(n, i-> findin(I[i], i < n ? (1:sz[i]) : (1:s)))::typeof(I)
-    src::typeof(I) = ntuple(n, i-> I[i][findin(I[i], i < n ? (1:sz[i]) : (1:s))])::typeof(I)
+    dst::typeof(I) = ntuple(i-> findin(I[i], i < n ? (1:sz[i]) : (1:s)), n)::typeof(I)
+    src::typeof(I) = ntuple(i-> I[i][findin(I[i], i < n ? (1:sz[i]) : (1:s))], n)::typeof(I)
     dst, src
 end
 

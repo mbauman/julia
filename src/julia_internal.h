@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 extern size_t jl_page_size;
+extern jl_function_t *jl_typeinf_func;
 
 STATIC_INLINE jl_value_t *newobj(jl_value_t *type, size_t nfields)
 {
@@ -47,8 +48,8 @@ void jl_set_t_uid_ctr(int i);
 uint32_t jl_get_gs_ctr(void);
 void jl_set_gs_ctr(uint32_t ctr);
 
+void NORETURN jl_no_method_error_bare(jl_function_t *f, jl_value_t *args);
 void NORETURN jl_no_method_error(jl_function_t *f, jl_value_t **args, size_t na);
-void jl_check_type_tuple(jl_value_t *t, jl_sym_t *name, const char *ctx);
 
 #define JL_CALLABLE(name) \
     DLLEXPORT jl_value_t *name(jl_value_t *F, jl_value_t **args, uint32_t nargs)
@@ -84,6 +85,7 @@ int jl_tuple_subtype(jl_value_t **child, size_t cl, jl_datatype_t *pdt, int ta);
 
 int jl_subtype_invariant(jl_value_t *a, jl_value_t *b, int ta);
 jl_value_t *jl_type_match(jl_value_t *a, jl_value_t *b);
+extern int type_match_invariance_mask;
 jl_value_t *jl_type_match_morespecific(jl_value_t *a, jl_value_t *b);
 int jl_types_equal_generic(jl_value_t *a, jl_value_t *b, int useenv);
 jl_datatype_t *jl_inst_concrete_tupletype_v(jl_value_t **p, size_t np);
@@ -117,8 +119,9 @@ extern JL_THREAD void *jl_stackbase;
 #endif
 
 void jl_dump_bitcode(char *fname);
-void jl_dump_objfile(char *fname, int jit_model);
+void jl_dump_objfile(char *fname, int jit_model, const char *sysimg_data, size_t sysimg_len);
 int32_t jl_get_llvm_gv(jl_value_t *p);
+void jl_idtable_rehash(jl_array_t **pa, size_t newsz);
 
 #ifdef _OS_LINUX_
 DLLEXPORT void jl_read_sonames(void);
@@ -152,6 +155,9 @@ DLLEXPORT size_t rec_backtrace_ctx(ptrint_t *data, size_t maxsize, bt_context_t 
 size_t rec_backtrace_ctx_dwarf(ptrint_t *data, size_t maxsize, bt_context_t ctx);
 #endif
 DLLEXPORT void jl_raise_debugger(void);
+#ifdef _OS_DARWIN_
+DLLEXPORT void attach_exception_port(void);
+#endif
 
 // timers
 // Returns time in nanosec
@@ -172,6 +178,10 @@ DLLEXPORT void jl_atexit_hook();
 
 #if defined(_CPU_X86_) || defined(_CPU_X86_64_)
 #define HAVE_CPUID
+#endif
+
+#ifdef SEGV_EXCEPTION
+extern DLLEXPORT jl_value_t *jl_segv_exception;
 #endif
 
 #ifdef __cplusplus

@@ -41,48 +41,59 @@ extern "C" {
 static int lisp_prompt = 0;
 static int codecov  = JL_LOG_NONE;
 static int malloclog= JL_LOG_NONE;
-static char *program = NULL;
 static int imagepathspecified = 0;
 
 static const char usage[] = "julia [options] [program] [args...]\n";
 static const char opts[]  =
-    " -v, --version            Display version information\n"
-    " -h, --help               Print this message\n"
-    " -q, --quiet              Quiet startup without banner\n"
-    " -H, --home <dir>         Set location of julia executable\n\n"
+    " -v, --version             Display version information\n"
+    " -h, --help                Print this message\n\n"
 
+    // startup options
+    " -J, --sysimage <file>     Start up with the given system image file\n"
+    " -H, --home <dir>          Set location of julia executable\n"
+    " --startup-file={yes|no}   Load ~/.juliarc.jl\n"
+    " -f, --no-startup          Don't load ~/.juliarc (deprecated, use --startup-file=no)\n"
+    " -F                        Load ~/.juliarc (deprecated, use --startup-file=yes)\n"
+    " --handle-signals={yes|no} Enable or disable Julia's default signal handlers\n\n"
+
+    // actions
     " -e, --eval <expr>         Evaluate <expr>\n"
     " -E, --print <expr>        Evaluate and show <expr>\n"
-    " -P, --post-boot <expr>    Evaluate <expr>, but don't disable interactive mode\n"
-    " -L, --load <file>         Load <file> immediately on all processors\n"
-    " -J, --sysimage <file>     Start up with the given system image file\n"
-    " -C, --cpu-target <target> Limit usage of cpu features up to <target>\n\n"
+    " -P, --post-boot <expr>    Evaluate <expr>, but don't disable interactive mode (deprecated, use -i -e instead)\n"
+    " -L, --load <file>         Load <file> immediately on all processors\n\n"
 
+    // parallel options
     " -p, --procs {N|auto}      Integer value N launches N additional local worker processes\n"
     "                           'auto' launches as many workers as the number of local cores\n"
     " --machinefile <file>      Run processes on hosts listed in <file>\n\n"
 
-    " -i                        Force isinteractive() to be true\n"
-    " --color={yes|no}          Enable or disable color text\n\n"
+    // interactive options
+    " -i                        Interactive mode; REPL runs and isinteractive() is true\n"
+    " -q, --quiet               Quiet startup (no banner)\n"
+    " --color={yes|no}          Enable or disable color text\n"
     " --history-file={yes|no}   Load or save history\n"
-    " --no-history-file         Don't load history file (deprecated, use --history-file=no)\n"
-    " --startup-file={yes|no}   Load ~/.juliarc.jl\n"
-    " -f, --no-startup          Don't load ~/.juliarc (deprecated, use --startup-file=no)\n"
-    " -F                        Load ~/.juliarc (deprecated, use --startup-file=yes)\n\n"
+    " --no-history-file         Don't load history file (deprecated, use --history-file=no)\n\n"
 
-    " --compile={yes|no|all}    Enable or disable compiler, or request exhaustive compilation\n\n"
-
-    " --code-coverage={none|user|all}, --code-coverage\n"
-    "                           Count executions of source lines (omitting setting is equivalent to 'user')\n\n"
-
-    " --track-allocation={none|user|all}, --track-allocation\n"
-    "                           Count bytes allocated by each source line\n\n"
-    " -O, --optimize\n"
-    "                           Run time-intensive code optimizations\n"
+    // code generation options
+    " --compile={yes|no|all}    Enable or disable compiler, or request exhaustive compilation\n"
+    " -C, --cpu-target <target> Limit usage of cpu features up to <target>\n"
+    " -O, --optimize            Run time-intensive code optimizations\n"
+    " --inline={yes|no}         Control whether inlining is permitted (overrides functions declared as @inline)\n"
     " --check-bounds={yes|no}   Emit bounds checks always or never (ignoring declarations)\n"
-    " --dump-bitcode={yes|no}   Dump bitcode for the system image (used with --build)\n"
-    " --depwarn={yes|no}        Enable or disable syntax and method deprecation warnings\n"
-    " --inline={yes|no}         Control whether inlining is permitted (overrides functions declared as @inline)\n";
+    " --math-mode={ieee,fast}   Disallow or enable unsafe floating point optimizations (overrides @fastmath declaration)\n\n"
+
+    // error and warning options
+    " --depwarn={yes|no}        Enable or disable syntax and method deprecation warnings\n\n"
+
+    // compiler output options
+    " --build name              Generate a system image with the given name (without extension)\n"
+    " --dump-bitcode={yes|no}   Dump bitcode for the system image\n\n"
+
+    // instrumentation options
+    " --code-coverage={none|user|all}, --code-coverage\n"
+    "                           Count executions of source lines (omitting setting is equivalent to 'user')\n"
+    " --track-allocation={none|user|all}, --track-allocation\n"
+    "                           Count bytes allocated by each source line\n";
 
 void parse_opts(int *argcp, char ***argvp)
 {
@@ -100,7 +111,8 @@ void parse_opts(int *argcp, char ***argvp)
            opt_inline,
            opt_math_mode,
            opt_worker,
-           opt_bind_to
+           opt_bind_to,
+           opt_handle_signals
     };
     static char* shortopts = "+vhqFfH:e:E:P:L:J:C:ip:Ob:";
     static struct option longopts[] = {
@@ -133,6 +145,7 @@ void parse_opts(int *argcp, char ***argvp)
         { "depwarn",         required_argument, 0, opt_depwarn },
         { "inline",          required_argument, 0, opt_inline },
         { "math-mode",       required_argument, 0, opt_math_mode },
+        { "handle-signals",  required_argument, 0, opt_handle_signals },
         // hidden command line options
         { "build",           required_argument, 0, 'b' },
         { "worker",          no_argument,       0, opt_worker },
@@ -200,9 +213,10 @@ void parse_opts(int *argcp, char ***argvp)
                 jl_options.nprocs = jl_cpu_cores();
             }
             else {
-                jl_options.nprocs = strtol(optarg, &endptr, 10);
-                if (errno != 0 || optarg == endptr || *endptr != 0 || jl_options.nprocs < 1)
+                long nprocs = strtol(optarg, &endptr, 10);
+                if (errno != 0 || optarg == endptr || *endptr != 0 || nprocs < 1 || nprocs >= INT_MAX)
                     jl_errorf("julia: -p,--procs=<n> must be an integer >= 1\n");
+                jl_options.nprocs = (int)nprocs;
             }
             break;
         case opt_machinefile:
@@ -319,6 +333,8 @@ void parse_opts(int *argcp, char ***argvp)
         case opt_math_mode:
             if (!strcmp(optarg,"ieee"))
                 jl_options.fast_math = JL_OPTIONS_FAST_MATH_OFF;
+            else if (!strcmp(optarg,"fast"))
+                jl_options.fast_math = JL_OPTIONS_FAST_MATH_ON;
             else if (!strcmp(optarg,"user"))
                 jl_options.fast_math = JL_OPTIONS_FAST_MATH_DEFAULT;
             else
@@ -335,6 +351,14 @@ void parse_opts(int *argcp, char ***argvp)
         case opt_bind_to:
             jl_options.bindto = strdup(optarg);
             break;
+        case opt_handle_signals:
+            if (!strcmp(optarg,"yes"))
+                jl_options.handle_signals = JL_OPTIONS_HANDLE_SIGNALS_ON;
+            else if (!strcmp(optarg,"no"))
+                jl_options.handle_signals = JL_OPTIONS_HANDLE_SIGNALS_OFF;
+            else
+                jl_errorf("julia: invalid argument to --handle-signals (%s)\n", optarg);
+            break;
         default:
             jl_errorf("julia: unhandled option -- %c\n"
                       "This is a bug, please report it.\n", c);
@@ -345,13 +369,9 @@ void parse_opts(int *argcp, char ***argvp)
     optind -= skip;
     *argvp += optind;
     *argcp -= optind;
-    if (jl_options.image_file==NULL && *argcp > 0) {
-        if (strcmp((*argvp)[0], "-"))
-            program = (*argvp)[0];
-    }
 }
 
-static int exec_program(void)
+static int exec_program(char *program)
 {
     int err = 0;
  again: ;
@@ -427,13 +447,6 @@ static int true_main(int argc, char *argv[])
         }
     }
 
-    // run program if specified, otherwise enter REPL
-    if (program) {
-        int ret = exec_program();
-        uv_tty_reset_mode();
-        return ret;
-    }
-
     jl_function_t *start_client = jl_base_module ?
         (jl_function_t*)jl_get_global(jl_base_module, jl_symbol("_start")) : NULL;
 
@@ -442,16 +455,24 @@ static int true_main(int argc, char *argv[])
         return 0;
     }
 
+    // run program if specified, otherwise enter REPL
+    if (argc > 0) {
+        if (strcmp(argv[0], "-")) {
+            return exec_program(argv[0]);
+        }
+    }
+
     ios_puts("warning: Base._start not defined, falling back to economy mode repl.\n", ios_stdout);
     if (!jl_errorexception_type)
         ios_puts("warning: jl_errorexception_type not defined; any errors will be fatal.\n", ios_stdout);
+
     while (!ios_eof(ios_stdin)) {
-        char *line = NULL;
+        char *volatile line = NULL;
         JL_TRY {
             ios_puts("\njulia> ", ios_stdout);
             ios_flush(ios_stdout);
             line = ios_readline(ios_stdin);
-            jl_value_t *val = jl_eval_string(line);
+            jl_value_t *val = (jl_value_t*)jl_eval_string(line);
             if (jl_exception_occurred()) {
                 jl_printf(JL_STDERR, "error during run:\n");
                 jl_static_show(JL_STDERR, jl_exception_in_transit);

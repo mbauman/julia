@@ -5,7 +5,7 @@ New language features
 ---------------------
 
   * Function call overloading: for arbitrary objects `x` (not of type
-    `Function`), `x(...)` is transformed into `call(x, ...)`, and `Base.call`
+    `Function`), `x(...)` is transformed into `call(x, ...)`, and `call`
     can be overloaded as desired.  Constructors are now a special case of
     this mechanism, which allows e.g. constructors for abstract types.
     `T(...)` falls back to `convert(T, x)`, so all `convert` methods implicitly
@@ -23,7 +23,7 @@ New language features
     it operates at two different stages of evaluation. At compile time, the generated
     function is called with its arguments bound to the types for which it should
     specialize. The quoted expression it returns forms the body of the specialized
-    method which is then called at run time. ([#7311]).
+    method which is then called at run time ([#7311]).
 
   * (Also with syntax todo) Documentation system for functions, methods, types
     and macros in packages and user code ([#8791]). Type `?@doc` at the repl
@@ -31,6 +31,9 @@ New language features
 
   * Varargs functions like `foo{T}(x::T...)` may now restrict the number
     of such arguments using `foo{T,N}(x::Vararg{T,N})` ([#11242]).
+
+  * The syntax `function foo end` can be used to introduce a generic function without
+    yet adding any methods ([#8283]).
 
 Language changes
 ----------------
@@ -117,6 +120,13 @@ Language changes
   * The built-in `NTuple` type has been removed; `NTuple{N,T}` is now
     implemented internally as `Tuple{Vararg{T,N}}` ([#11242]).
 
+Command line option changes
+---------------------------
+
+  * The `-i` option now forces the REPL to run after loading the specified script (if any) ([#11347]).
+
+  * New option --handle-signals={yes|no} to disable Julia's signal handlers.
+
 Compiler improvements
 ---------------------
 
@@ -164,6 +174,8 @@ Library improvements
     * Split `Triangular` type into `UpperTriangular`, `LowerTriangular`, `UnitUpperTriagular` and `UnitLowerTriangular` ([#9779])
 
     * OpenBLAS 64-bit (ILP64) interface is now compiled with a `64_` suffix ([#8734]) to avoid conflicts with external libraries using a 32-bit BLAS ([#4923]).
+
+    * New `vecdot` function, analogous to `vecnorm`, for Euclidean inner products over any iterable container ([#11067]).
 
   * Strings
 
@@ -372,6 +384,15 @@ Deprecated or removed
   * the `--int-literals` compiler option is no longer accepted ([#9597]).
 
   * Instead of `linrange`, use `linspace` ([#9666]).
+
+  * The functions `is_valid_char`, `is_valid_ascii`, `is_valid_utf8`, `is_valid_utf16`, and
+    `is_valid_utf32` have been replaced by generic `isvalid` methods.
+    The single argument form `isvalid(value)` can now be used for values of type `Char`, `ASCIIString`,
+    `UTF8String`, `UTF16String` and `UTF32String`.
+    The two argument form `isvalid(type, value)` can be used with the above types, with values
+    of type `Vector{UInt8}`, `Vector{UInt16}`, `Vector{UInt32}`, and `Vector{Char}` ([#11241]).
+
+  * Instead of `utf32(64,123,...)` use `utf32(UInt32[64,123,...])` ([#11379]).
 
 Julia v0.3.0 Release Notes
 ==========================
@@ -1321,6 +1342,7 @@ Too numerous to mention.
 [#8089]: https://github.com/JuliaLang/julia/issues/8089
 [#8152]: https://github.com/JuliaLang/julia/issues/8152
 [#8246]: https://github.com/JuliaLang/julia/issues/8246
+[#8283]: https://github.com/JuliaLang/julia/issues/8283
 [#8297]: https://github.com/JuliaLang/julia/issues/8297
 [#8399]: https://github.com/JuliaLang/julia/issues/8399
 [#8423]: https://github.com/JuliaLang/julia/issues/8423
@@ -1385,6 +1407,7 @@ Too numerous to mention.
 [#9779]: https://github.com/JuliaLang/julia/issues/9779
 [#9862]: https://github.com/JuliaLang/julia/issues/9862
 [#9957]: https://github.com/JuliaLang/julia/issues/9957
+[#10008]: https://github.com/JuliaLang/julia/issues/10008
 [#10024]: https://github.com/JuliaLang/julia/issues/10024
 [#10031]: https://github.com/JuliaLang/julia/issues/10031
 [#10075]: https://github.com/JuliaLang/julia/issues/10075
@@ -1412,6 +1435,13 @@ Too numerous to mention.
 [#10888]: https://github.com/JuliaLang/julia/issues/10888
 [#10893]: https://github.com/JuliaLang/julia/issues/10893
 [#10914]: https://github.com/JuliaLang/julia/issues/10914
+[#10955]: https://github.com/JuliaLang/julia/issues/10955
 [#10994]: https://github.com/JuliaLang/julia/issues/10994
+[#11105]: https://github.com/JuliaLang/julia/issues/11105
 [#11145]: https://github.com/JuliaLang/julia/issues/11145
 [#11242]: https://github.com/JuliaLang/julia/issues/11242
+[#11171]: https://github.com/JuliaLang/julia/issues/11171
+[#11241]: https://github.com/JuliaLang/julia/issues/11241
+[#11347]: https://github.com/JuliaLang/julia/issues/11347
+[#11379]: https://github.com/JuliaLang/julia/issues/11379
+[#11067]: https://github.com/JuliaLang/julia/issues/11067

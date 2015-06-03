@@ -14,9 +14,12 @@
   (if (any vararg? (butlast l))
       (error "invalid ... on non-final argument"))
   (map (lambda (a)
-         (if (and (pair? a) (eq? (car a) 'kw))
-             `(kw ,(fill-missing-argname (cadr a)) ,(caddr a))
-             (fill-missing-argname a)))
+         (cond ((and (pair? a) (eq? (car a) 'kw))
+                `(kw ,(fill-missing-argname (cadr a)) ,(caddr a)))
+               ((and (pair? a) (eq? (car a) '...))
+                `(... ,(fill-missing-argname (cadr a))))
+               (else
+                (fill-missing-argname a))))
        l))
 
 (define (deparse-arglist l (sep ",")) (string.join (map deparse l) sep))
@@ -1083,7 +1086,9 @@
                      (expand-binding-forms
                       `(-> ,name ,(caddr e)))
                      e))
-             e)))
+	     (if (and (length= e 2) (symbol? name))
+		 `(method ,name)
+		 e))))
 
       ((->)
        (let ((a (cadr e))
@@ -1684,7 +1689,7 @@
                                (expand-forms
                                 (lower-tuple-assignment
                                  (list lhs st)
-                                 `(call (|.| (top Base) (quote indexed_next))
+                                 `(call (top indexed_next)
                                         ,xx ,(+ i 1) ,st))))
                              (iota (length lhss))
                              lhss)
@@ -3038,10 +3043,12 @@ So far only the second case can actually occur.
                  (vinfo:set-sa! vi #f)
                  (if (assq (car vi) captvars)
                      (vinfo:set-iasg! vi #t)))))
-         `(method ,(cadr e)
-                  ,(analyze-vars (caddr  e) env captvars)
-                  ,(analyze-vars (cadddr e) env captvars)
-          ,(caddddr e)))
+	 (if (length= e 2)
+	     `(method ,(cadr e))
+	     `(method ,(cadr e)
+		      ,(analyze-vars (caddr  e) env captvars)
+		      ,(analyze-vars (cadddr e) env captvars)
+		      ,(caddddr e))))
         (else (cons (car e)
                     (map (lambda (x) (analyze-vars x env captvars))
                          (cdr e)))))))
@@ -3225,11 +3232,7 @@ So far only the second case can actually occur.
                     (vinf  (var-info-for vname vi)))
                (if (and vinf
                         (not (and (pair? code)
-                                  (equal? (car code) `(newvar ,vname))))
-                        ;; TODO: remove the following expression to re-null
-                        ;; all variables when they are allocated. see issue #1571
-                        (vinfo:capt vinf)
-                        )
+                                  (equal? (car code) `(newvar ,vname)))))
                    (emit `(newvar ,vname))
                    #f)))
             ((newvar)
@@ -3239,9 +3242,40 @@ So far only the second case can actually occur.
                  #f))
             (else  (emit (goto-form e))))))
     (compile e '())
-    (cons 'body (reverse! code))))
+    (let* ((stmts (reverse! code))
+	   (di    (definitely-initialized-vars stmts vi)))
+      (cons 'body (filter (lambda (e)
+			    (not (and (pair? e) (eq? (car e) 'newvar)
+				      (has? di (cadr e)))))
+			  stmts)))))
 
 (define to-goto-form goto-form)
+
+;; find newvar nodes that are unnecessary because (1) the variable is not
+;; captured, and (2) the variable is assigned before any branches.
+;; this is used to remove newvar nodes that are not needed for re-initializing
+;; variables to undefined (see issue #11065). it doesn't look for variable
+;; *uses*, because any variables used-before-def that also pass this test
+;; are *always* used undefined, and therefore don't need to be *re*-initialized.
+(define (definitely-initialized-vars stmts vi)
+  (let ((vars (table))
+	(di   (table)))
+    (let loop ((stmts stmts))
+      (if (null? stmts)
+	  di
+	  (begin
+	    (let ((e (car stmts)))
+	      (cond ((and (pair? e) (eq? (car e) 'newvar))
+		     (let ((vinf (var-info-for (cadr e) vi)))
+		       (if (not (vinfo:capt vinf))
+			   (put! vars (cadr e) #t))))
+		    ((and (pair? e) (eq? (car e) '=))
+		     (if (has? vars (cadr e))
+			 (begin (del! vars (cadr e))
+				(put! di (cadr e) #t))))
+		    ((and (pair? e) (memq (car e) '(goto gotoifnot)))
+		     (set! vars (table)))))
+	    (loop (cdr stmts)))))))
 
 ;; macro expander
 

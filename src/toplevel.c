@@ -93,6 +93,7 @@ jl_value_t *jl_eval_module_expr(jl_expr_t *ex)
 {
     static arraylist_t module_stack;
     static int initialized=0;
+    static jl_module_t *outermost = NULL;
     if (!initialized) {
         arraylist_new(&module_stack, 0);
         initialized = 1;
@@ -110,14 +111,13 @@ jl_value_t *jl_eval_module_expr(jl_expr_t *ex)
     jl_module_t *parent_module = jl_current_module;
     jl_binding_t *b = jl_get_binding_wr(parent_module, name);
     jl_declare_constant(b);
-    if (b->value != NULL) {
+    if (b->value != NULL && jl_options.build_path == NULL) {
         jl_printf(JL_STDERR, "Warning: replacing module %s\n", name->name);
     }
     jl_module_t *newm = jl_new_module(name);
     newm->parent = parent_module;
     b->value = (jl_value_t*)newm;
-
-    gc_wb(parent_module, newm);
+    gc_wb_binding(b, newm);
 
     if (parent_module == jl_main_module && name == jl_symbol("Base")) {
         // pick up Base module during bootstrap
@@ -146,6 +146,10 @@ jl_value_t *jl_eval_module_expr(jl_expr_t *ex)
     JL_GC_PUSH1(&last_module);
     jl_module_t *task_last_m = jl_current_task->current_module;
     jl_current_task->current_module = jl_current_module = newm;
+    jl_module_t *prev_outermost = outermost;
+    size_t stackidx = module_stack.len;
+    if (outermost == NULL)
+        outermost = newm;
 
     jl_array_t *exprs = ((jl_expr_t*)jl_exprarg(ex, 2))->args;
     JL_TRY {
@@ -158,11 +162,14 @@ jl_value_t *jl_eval_module_expr(jl_expr_t *ex)
     JL_CATCH {
         jl_current_module = last_module;
         jl_current_task->current_module = task_last_m;
+        outermost = prev_outermost;
+        module_stack.len = stackidx;
         jl_rethrow();
     }
     JL_GC_POP();
     jl_current_module = last_module;
     jl_current_task->current_module = task_last_m;
+    outermost = prev_outermost;
 
 #if 0
     // some optional post-processing steps
@@ -186,10 +193,13 @@ jl_value_t *jl_eval_module_expr(jl_expr_t *ex)
 
     arraylist_push(&module_stack, newm);
 
-    if (jl_current_module == jl_main_module) {
-        while (module_stack.len > 0) {
-            jl_module_load_time_initialize((jl_module_t *) arraylist_pop(&module_stack));
+    if (outermost == NULL || jl_current_module == jl_main_module) {
+        size_t i, l=module_stack.len;
+        for(i = stackidx; i < l; i++) {
+            jl_module_load_time_initialize((jl_module_t*)module_stack.items[i]);
         }
+        assert(module_stack.len == l);
+        module_stack.len = stackidx;
     }
 
     return jl_nothing;
@@ -205,11 +215,14 @@ static int is_intrinsic(jl_module_t *m, jl_sym_t *s)
 // this is only needed because of the bootstrapping process:
 // - initially Base doesn't exist and top === Core
 // - later, it refers to either old Base or new Base
-jl_module_t *jl_base_relative_to(jl_module_t *m)
+DLLEXPORT jl_module_t *jl_base_relative_to(jl_module_t *m)
 {
-    if (m==jl_core_module || m==jl_old_base_module)
-        return m;
-    return (jl_base_module==NULL) ? jl_core_module : jl_base_module;
+    while (m != jl_main_module) {
+        if (m->istopmod)
+            return m;
+        m = m->parent;
+    }
+    return jl_top_module;
 }
 
 int jl_has_intrinsics(jl_expr_t *e, jl_module_t *m)
@@ -582,8 +595,7 @@ jl_value_t *jl_parse_eval_all(const char *fname, size_t len)
 
 jl_value_t *jl_load(const char *fname)
 {
-    if (jl_current_module == jl_base_module) {
-        //This deliberatly uses ios, because stdio initialization has been moved to Julia
+    if (jl_current_module->istopmod) {
         jl_printf(JL_STDOUT, "%s\r\n", fname);
 #ifdef _OS_WINDOWS_
         uv_run(uv_default_loop(), (uv_run_mode)1);
@@ -611,12 +623,6 @@ DLLEXPORT jl_value_t *jl_load_(jl_value_t *str)
 // type definition ------------------------------------------------------------
 
 void jl_reinstantiate_inner_types(jl_datatype_t *t);
-
-void jl_check_type_tuple(jl_value_t *t, jl_sym_t *name, const char *ctx)
-{
-    if (!jl_is_tuple_type(t))
-        jl_type_error_rt(name->name, ctx, (jl_value_t*)jl_type_type, t);
-}
 
 void jl_set_datatype_super(jl_datatype_t *tt, jl_value_t *super)
 {
@@ -664,6 +670,30 @@ static int type_contains(jl_value_t *ty, jl_value_t *x)
 }
 
 void print_func_loc(JL_STREAM *s, jl_lambda_info_t *li);
+
+// empty generic function def
+// TODO: maybe have jl_method_def call this
+DLLEXPORT jl_value_t *jl_generic_function_def(jl_sym_t *name, jl_value_t **bp, jl_value_t *bp_owner,
+                                              jl_binding_t *bnd)
+{
+    jl_value_t *gf=NULL;
+
+    if (bnd && bnd->value != NULL && !bnd->constp)
+        jl_errorf("cannot define function %s; it already has a value", bnd->name->name);
+    if (*bp != NULL) {
+        gf = *bp;
+        if (!jl_is_gf(gf))
+            jl_errorf("cannot define function %s; it already has a value", name->name);
+    }
+    if (bnd)
+        bnd->constp = 1;
+    if (*bp == NULL) {
+        gf = (jl_value_t*)jl_new_generic_function(name);
+        *bp = gf;
+        if (bp_owner) gc_wb(bp_owner, gf);
+    }
+    return gf;
+}
 
 DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t *bp_owner,
                                     jl_binding_t *bnd,

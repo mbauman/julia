@@ -122,9 +122,13 @@ print(io::IO, n::Unsigned) = print(io, dec(n))
 show{T}(io::IO, p::Ptr{T}) = print(io, typeof(p), " @0x$(hex(UInt(p), WORD_SIZE>>2))")
 
 function show(io::IO, p::Pair)
+    isa(p.first,Pair) && print(io, "(")
     show(io, p.first)
+    isa(p.first,Pair) && print(io, ")")
     print(io, "=>")
+    isa(p.second,Pair) && print(io, "(")
     show(io, p.second)
+    isa(p.second,Pair) && print(io, ")")
 end
 
 function show(io::IO, m::Module)
@@ -155,7 +159,7 @@ function show_delim_array(io::IO, itr::AbstractArray, op, delim, cl, delim_one, 
                 x = itr[i]
                 multiline = isa(x,AbstractArray) && ndims(x)>1 && length(x)>0
                 newline && multiline && println(io)
-                if is(x, itr)
+                if !isbits(x) && is(x, itr)
                     print(io, "#= circular reference =#")
                 elseif compact
                     showcompact_lim(io, x)
@@ -195,7 +199,7 @@ function show_delim_array(io::IO, itr, op, delim, cl, delim_one, compact=false, 
             x, state = next(itr,state)
             multiline = isa(x,AbstractArray) && ndims(x)>1 && length(x)>0
             newline && multiline && println(io)
-            if is(x, itr)
+            if !isbits(x) && is(x, itr)
                 print(io, "#= circular reference =#")
             else
                 show(io, x)
@@ -250,8 +254,11 @@ show(io::IO, s::Symbol) = show_unquoted_quote_expr(io, s, 0, 0)
 
 typealias ExprNode Union(Expr, QuoteNode, SymbolNode, LineNumberNode,
                          LabelNode, GotoNode, TopNode)
-print        (io::IO, ex::ExprNode)    = (show_unquoted(io, ex); nothing)
-show         (io::IO, ex::ExprNode)    = show_unquoted_quote_expr(io, ex, 0, 0)
+# Operators have precedence levels from 1-N, and show_unquoted defaults to a
+# precedence level of 0 (the fourth argument). The top-level print and show
+# methods use a precedence of -1 to specially allow space-separated macro syntax
+print        (io::IO, ex::ExprNode)    = (show_unquoted(io, ex, 0, -1); nothing)
+show         (io::IO, ex::ExprNode)    = show_unquoted_quote_expr(io, ex, 0, -1)
 show_unquoted(io::IO, ex)              = show_unquoted(io, ex, 0, 0)
 show_unquoted(io::IO, ex, indent::Int) = show_unquoted(io, ex, indent, 0)
 show_unquoted(io::IO, ex, ::Int,::Int) = show(io, ex)
@@ -259,7 +266,7 @@ show_unquoted(io::IO, ex, ::Int,::Int) = show(io, ex)
 ## AST printing constants ##
 
 const indent_width = 4
-const quoted_syms = Set{Symbol}([:(:),:(::),:(:=),:(=),:(==),:(===),:(=>)])
+const quoted_syms = Set{Symbol}([:(:),:(::),:(:=),:(=),:(==),:(!=),:(===),:(!==),:(=>),:(>=),:(<=)])
 const uni_ops = Set{Symbol}([:(+), :(-), :(!), :(¬), :(~), :(<:), :(>:), :(√), :(∛), :(∜)])
 const expr_infix_wide = Set([:(=), :(+=), :(-=), :(*=), :(/=), :(\=), :(&=),
     :(|=), :($=), :(>>>=), :(>>=), :(<<=), :(&&), :(||), :(<:), :(=>)])
@@ -341,7 +348,7 @@ function show_block(io::IO, head, args::Vector, body, indent::Int)
     exs = (is_expr(body, :block) || is_expr(body, :body)) ? body.args : Any[body]
     for ex in exs
         if !is_linenumber(ex); print(io, '\n', " "^ind); end
-        show_unquoted(io, ex, ind)
+        show_unquoted(io, ex, ind, -1)
     end
     print(io, '\n', " "^indent)
 end
@@ -387,9 +394,9 @@ function show_call(io::IO, head, func, func_args, indent)
     end
     if !isempty(func_args) && isa(func_args[1], Expr) && func_args[1].head === :parameters
         print(io, op)
-        show_list(io, func_args[2:end], ',', indent, 0)
+        show_list(io, func_args[2:end], ',', indent)
         print(io, "; ")
-        show_list(io, func_args[1].args, ',', indent, 0)
+        show_list(io, func_args[1].args, ',', indent)
         print(io, cl)
     else
         show_enclosed_list(io, op, func_args, ",", cl, indent)
@@ -434,7 +441,7 @@ function show_unquoted_quote_expr(io::IO, value, indent::Int, prec::Int)
             print(io, "end")
         else
             print(io, ":(")
-            show_unquoted(io, value, indent+indent_width, 0)
+            show_unquoted(io, value, indent+indent_width, -1)
             print(io, ")")
         end
     end
@@ -463,7 +470,7 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
     elseif (head in expr_infix_any && nargs==2) || (is(head,:(:)) && nargs==3)
         func_prec = operator_precedence(head)
         head_ = head in expr_infix_wide ? " $head " : head
-        if func_prec < prec
+        if func_prec <= prec
             show_enclosed_list(io, '(', args, head_, ')', indent, func_prec, true)
         else
             show_list(io, args, head_, indent, func_prec, true)
@@ -484,13 +491,8 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
         if is(head, :tuple) && nargs == 1; print(io, ','); end
         head !== :row && print(io, cl)
 
-    # function declaration (like :call but always printed with parens)
-    # (:calldecl is a "fake" expr node created when we find a :function expr)
-    elseif head == :calldecl && nargs >= 1
-        show_call(io, head, args[1], args[2:end], indent)
-
     # function call
-    elseif haskey(expr_calls, head) && nargs >= 1  # :call/:ref/:curly
+    elseif head == :call && nargs >= 1
         func = args[1]
         func_prec = operator_precedence(func)
         func_args = args[2:end]
@@ -535,10 +537,14 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
                 show_enclosed_list(io, op, func_args, ",", cl, indent)
             end
 
-        # normal function (i.e. "f(x,y)" or "A[x,y]")
+        # normal function (i.e. "f(x,y)")
         else
             show_call(io, head, func, func_args, indent)
         end
+
+    # other call-like expressions ("A[1,2]", "T{X,Y}")
+    elseif haskey(expr_calls, head) && nargs >= 1  # :ref/:curly/:calldecl
+        show_call(io, head, ex.args[1], ex.args[2:end], indent)
 
     # comprehensions
     elseif (head === :typed_comprehension || head === :typed_dict_comprehension) && length(args) == 3
@@ -611,7 +617,12 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
         show_list(io, args, ", ", indent)
 
     elseif is(head, :macrocall) && nargs >= 1
-        show_list(io, args, ' ', indent)
+        # Use the functional syntax unless specifically designated with prec=-1
+        if prec >= 0
+            show_call(io, :call, ex.args[1], ex.args[2:end], indent)
+        else
+            show_list(io, args, ' ', indent)
+        end
 
     elseif is(head, :typealias) && nargs == 2
         print(io, "typealias ")

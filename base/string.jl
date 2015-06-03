@@ -793,10 +793,6 @@ write(io::IO, s::RopeString) = (write(io, s.head); write(io, s.tail))
 sizeof(s::RopeString) = sizeof(s.head) + sizeof(s.tail)
 
 ## uppercase and lowercase transformations ##
-
-uppercase(c::Char) = convert(Char, ccall(:towupper, Cwchar_t, (Cwchar_t,), c))
-lowercase(c::Char) = convert(Char, ccall(:towlower, Cwchar_t, (Cwchar_t,), c))
-
 uppercase(s::AbstractString) = map(uppercase, s)
 lowercase(s::AbstractString) = map(lowercase, s)
 
@@ -968,8 +964,8 @@ byte_string_classify(s::ByteString) = byte_string_classify(s.data)
     # 1: valid ASCII
     # 2: valid UTF-8
 
-is_valid_ascii(s::Union(Array{UInt8,1},ByteString)) = byte_string_classify(s) == 1
-is_valid_utf8(s::Union(Array{UInt8,1},ByteString)) = byte_string_classify(s) != 0
+isvalid(::Type{ASCIIString}, s::Union(Array{UInt8,1},ByteString)) = byte_string_classify(s) == 1
+isvalid(::Type{UTF8String}, s::Union(Array{UInt8,1},ByteString)) = byte_string_classify(s) != 0
 
 ## multiline strings ##
 

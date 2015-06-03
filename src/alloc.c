@@ -62,6 +62,9 @@ jl_datatype_t *jl_void_type;
 jl_datatype_t *jl_voidpointer_type;
 jl_value_t *jl_an_empty_cell=NULL;
 jl_value_t *jl_stackovf_exception;
+#ifdef SEGV_EXCEPTION
+jl_value_t *jl_segv_exception;
+#endif
 jl_value_t *jl_diverror_exception;
 jl_value_t *jl_domain_exception;
 jl_value_t *jl_overflow_exception;
@@ -520,6 +523,8 @@ void jl_compute_field_offsets(jl_datatype_t *st)
         size_t fsz, al;
         if (jl_isbits(ty) && jl_is_leaf_type(ty)) {
             fsz = jl_datatype_size(ty);
+            if (__unlikely(fsz > JL_FIELD_MAX_SIZE))
+                jl_throw(jl_overflow_exception);
             al = ((jl_datatype_t*)ty)->alignment;
             st->fields[i].isptr = 0;
         }
@@ -536,6 +541,8 @@ void jl_compute_field_offsets(jl_datatype_t *st)
             if (al > alignm)
                 alignm = al;
         }
+        if (__unlikely(sz > JL_FIELD_MAX_OFFSET))
+            jl_throw(jl_overflow_exception);
         st->fields[i].offset = sz;
         st->fields[i].size = fsz;
         sz += fsz;

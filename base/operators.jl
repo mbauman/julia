@@ -19,7 +19,8 @@ isless(x::FloatingPoint, y::FloatingPoint) = (!isnan(x) & isnan(y)) | (signbit(x
 isless(x::Real,          y::FloatingPoint) = (!isnan(x) & isnan(y)) | (signbit(x) & !signbit(y)) | (x < y)
 isless(x::FloatingPoint, y::Real         ) = (!isnan(x) & isnan(y)) | (signbit(x) & !signbit(y)) | (x < y)
 
-==(T::Type, S::Type) = typeseq(T, S)
+=={T}(::Type{T}, ::Type{T}) = true  # encourage more specialization on types (see #11425)
+==(T::Type, S::Type)        = typeseq(T, S)
 
 ## comparison fallbacks ##
 
@@ -429,12 +430,14 @@ reverse(p::Pair) = Pair(p.second, p.first)
 # some operators not defined yet
 global //, >:, <|, hcat, hvcat, ⋅, ×, ∈, ∉, ∋, ∌, ⊆, ⊈, ⊊, ∩, ∪, √, ∛
 
-module Operators
+this_module = current_module()
+baremodule Operators
 
 export
     !,
     !=,
     !==,
+    ===,
     $,
     %,
     .%,
@@ -504,9 +507,9 @@ export
     ctranspose,
     call
 
-import Base: !, !=, $, %, .%, &, *, +, -, .!=, .+, .-, .*, ./, .<, .<=, .==, .>,
+import ..this_module: !, !=, $, %, .%, &, *, +, -, .!=, .+, .-, .*, ./, .<, .<=, .==, .>,
     .>=, .\, .^, /, //, <, <:, <<, <=, ==, >, >=, >>, .>>, .<<, >>>,
-    <|, |>, \, ^, |, ~, !==, >:, colon, hcat, vcat, hvcat, getindex, setindex!,
+    <|, |>, \, ^, |, ~, !==, ===, >:, colon, hcat, vcat, hvcat, getindex, setindex!,
     transpose, ctranspose, call,
     ≥, ≤, ≠, .≥, .≤, .≠, ÷, ⋅, ×, ∈, ∉, ∋, ∌, ⊆, ⊈, ⊊, ∩, ∪, √, ∛
 

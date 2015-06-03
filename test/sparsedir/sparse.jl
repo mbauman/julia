@@ -749,6 +749,10 @@ end
 
 # issue #9917
 @test sparse([]') == reshape(sparse([]), 1, 0)
+@test full(sparse([])) == zeros(0, 1)
+@test_throws BoundsError sparse([])[1]
+x = speye(100)
+@test_throws BoundsError x[-10:10]
 
 for T in (Int, Float16, Float32, Float64, BigInt, BigFloat)
     let R=rand(T[1:100;],2,2), I=rand(T[1:100;],2,2)
@@ -930,3 +934,41 @@ A = sparse([1.0])
 @test norm(A) == 1.0
 @test_throws ArgumentError norm(sprand(5,5,0.2),3)
 @test_throws ArgumentError norm(sprand(5,5,0.2),2)
+
+# test ishermitian and issym real matrices
+A = speye(5,5)
+@test ishermitian(A) == true
+@test issym(A) == true
+A[1,3] = 1.0
+@test ishermitian(A) == false
+@test issym(A) == false
+A[3,1] = 1.0
+@test ishermitian(A) == true
+@test issym(A) == true
+
+# test ishermitian and issym complex matrices
+A = speye(5,5) + im*speye(5,5)
+@test ishermitian(A) == false
+@test issym(A) == true
+A[1,4] = 1.0 + im
+@test ishermitian(A) == false
+@test issym(A) == false
+
+A = speye(Complex128, 5,5)
+A[3,2] = 1.0 + im
+@test ishermitian(A) == false
+@test issym(A) == false
+A[2,3] = 1.0 - im
+@test ishermitian(A) == true
+@test issym(A) == false
+
+A = sparse(zeros(5,5))
+@test ishermitian(A) == true
+@test issym(A) == true
+
+# Test with explicit zeros
+A = speye(Complex128, 5,5)
+A[3,1] = 2
+A.nzval[2] = 0.0
+@test ishermitian(A) == true
+@test issym(A) == true

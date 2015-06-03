@@ -99,14 +99,14 @@ convert an integer value back to a :obj:`Char` just as easily:
 Not all integer values are valid Unicode code points, but for
 performance, the :func:`Char` conversion does not check that every character
 value is valid. If you want to check that each converted value is a
-valid code point, use the :func:`is_valid_char` function:
+valid code point, use the :func:`isvalid` function:
 
 .. doctest::
 
     julia> Char(0x110000)
     '\U110000'
 
-    julia> is_valid_char(0x110000)
+    julia> isvalid(Char, 0x110000)
     false
 
 As of this writing, the valid Unicode code points are ``U+00`` through
@@ -640,7 +640,7 @@ which to start the search. For example:
 You can extract the following info from a :obj:`RegexMatch` object:
 
 -  the entire substring matched: ``m.match``
--  the captured substrings as a tuple of strings: ``m.captures``
+-  the captured substrings as an array of strings: ``m.captures``
 -  the offset at which the whole match begins: ``m.offset``
 -  the offsets of the captured substrings as a vector: ``m.offsets``
 
@@ -691,8 +691,8 @@ a string is invalid). Here's is a pair of somewhat contrived examples::
      0
      2
 
-It is convenient to have captures returned as a tuple so that one can
-use tuple destructuring syntax to bind them to local variables::
+It is convenient to have captures returned as an array so that one can
+use destructuring syntax to bind them to local variables::
 
     julia> first, second, third = m.captures; first
     "a"

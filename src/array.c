@@ -425,9 +425,9 @@ JL_CALLABLE(jl_f_arraysize)
 jl_value_t *jl_arrayref(jl_array_t *a, size_t i)
 {
     assert(i < jl_array_len(a));
-    jl_value_t *el_type = (jl_value_t*)jl_tparam0(jl_typeof(a));
     jl_value_t *elt;
     if (!a->ptrarray) {
+        jl_value_t *el_type = (jl_value_t*)jl_tparam0(jl_typeof(a));
         elt = jl_new_bits(el_type, &((char*)a->data)[i*a->elsize]);
     }
     else {
@@ -469,6 +469,13 @@ JL_CALLABLE(jl_f_arrayref)
     jl_array_t *a = (jl_array_t*)args[0];
     size_t i = array_nd_index(a, &args[1], nargs-1, "arrayref");
     return jl_arrayref(a, i);
+}
+
+DLLEXPORT int jl_array_isassigned(jl_array_t *a, size_t i)
+{
+    if (a->ptrarray)
+        return ((jl_value_t**)jl_array_data(a))[i] != NULL;
+    return 1;
 }
 
 int jl_array_isdefined(jl_value_t **args0, int nargs)

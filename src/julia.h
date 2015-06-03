@@ -265,6 +265,9 @@ typedef struct {
     uint16_t isptr:1;
 } jl_fielddesc_t;
 
+#define JL_FIELD_MAX_OFFSET ((1ul << 16) - 1ul)
+#define JL_FIELD_MAX_SIZE ((1ul << 15) - 1ul)
+
 typedef struct _jl_datatype_t {
     JL_DATA_TYPE
     jl_typename_t *name;
@@ -318,6 +321,7 @@ typedef struct _jl_module_t {
     arraylist_t usings;  // modules with all bindings potentially imported
     jl_array_t *constant_table;
     jl_function_t *call_func;  // cached lookup of `call` within this module
+    uint8_t istopmod;
     uint64_t uuid;
 } jl_module_t;
 
@@ -880,7 +884,7 @@ DLLEXPORT uptrint_t jl_object_id(jl_value_t *v);
 // type predicates and basic operations
 int jl_is_type(jl_value_t *v);
 DLLEXPORT int jl_is_leaf_type(jl_value_t *v);
-int jl_has_typevars(jl_value_t *v);
+DLLEXPORT int jl_has_typevars(jl_value_t *v);
 DLLEXPORT int jl_subtype(jl_value_t *a, jl_value_t *b, int ta);
 int jl_type_morespecific(jl_value_t *a, jl_value_t *b);
 DLLEXPORT int jl_types_equal(jl_value_t *a, jl_value_t *b);
@@ -942,6 +946,8 @@ jl_expr_t *jl_exprn(jl_sym_t *head, size_t n);
 jl_function_t *jl_new_generic_function(jl_sym_t *name);
 void jl_add_method(jl_function_t *gf, jl_tupletype_t *types, jl_function_t *meth,
                    jl_svec_t *tvars, int8_t isstaged);
+DLLEXPORT jl_value_t *jl_generic_function_def(jl_sym_t *name, jl_value_t **bp, jl_value_t *bp_owner,
+                                              jl_binding_t *bnd);
 DLLEXPORT jl_value_t *jl_method_def(jl_sym_t *name, jl_value_t **bp, jl_value_t *bp_owner, jl_binding_t *bnd,
                                     jl_svec_t *argtypes, jl_function_t *f, jl_value_t *isstaged,
                                     jl_value_t *call_func, int iskw);
@@ -1092,6 +1098,7 @@ extern DLLEXPORT jl_module_t *jl_main_module;
 extern DLLEXPORT jl_module_t *jl_internal_main_module;
 extern DLLEXPORT jl_module_t *jl_core_module;
 extern DLLEXPORT jl_module_t *jl_base_module;
+extern DLLEXPORT jl_module_t *jl_top_module;
 extern DLLEXPORT jl_module_t *jl_current_module;
 DLLEXPORT jl_module_t *jl_new_module(jl_sym_t *name);
 // get binding for reading
@@ -1192,8 +1199,10 @@ DLLEXPORT void jl_atexit_hook(void);
 DLLEXPORT void NORETURN jl_exit(int status);
 
 DLLEXPORT void jl_preload_sysimg_so(const char *fname);
+DLLEXPORT ios_t *jl_create_system_image();
 DLLEXPORT void jl_save_system_image(const char *fname);
 DLLEXPORT void jl_restore_system_image(const char *fname);
+DLLEXPORT void jl_restore_system_image_data(const char *buf, size_t len);
 DLLEXPORT int jl_save_new_module(const char *fname, jl_module_t *mod);
 DLLEXPORT jl_module_t *jl_restore_new_module(const char *fname);
 void jl_init_restored_modules();
@@ -1252,7 +1261,7 @@ DLLEXPORT jl_value_t *jl_interpret_toplevel_expr_in(jl_module_t *m, jl_value_t *
 jl_value_t *jl_static_eval(jl_value_t *ex, void *ctx_, jl_module_t *mod,
                            jl_value_t *sp, jl_expr_t *ast, int sparams, int allow_alloc);
 int jl_is_toplevel_only_expr(jl_value_t *e);
-jl_module_t *jl_base_relative_to(jl_module_t *m);
+DLLEXPORT jl_module_t *jl_base_relative_to(jl_module_t *m);
 void jl_type_infer(jl_lambda_info_t *li, jl_tupletype_t *argtypes, jl_lambda_info_t *def);
 
 jl_function_t *jl_method_lookup_by_type(jl_methtable_t *mt, jl_tupletype_t *types,
@@ -1338,14 +1347,16 @@ DLLEXPORT extern volatile sig_atomic_t jl_defer_signal;
         jl_defer_signal--;                                      \
         if (jl_defer_signal == 0 && jl_signal_pending != 0) {   \
             jl_signal_pending = 0;                              \
-            jl_throw(jl_interrupt_exception);                   \
+            jl_sigint_action();                                 \
         }                                                       \
     } while(0)
 
+DLLEXPORT void jl_sigint_action(void);
 DLLEXPORT void restore_signals(void);
-DLLEXPORT void jl_install_sigint_handler();
+DLLEXPORT void jl_install_sigint_handler(void);
 DLLEXPORT void jl_sigatomic_begin(void);
 DLLEXPORT void jl_sigatomic_end(void);
+void jl_install_default_signal_handlers(void);
 
 
 // tasks and exceptions -------------------------------------------------------
@@ -1554,7 +1565,7 @@ typedef struct {
     const char *load;
     const char *image_file;
     const char *cpu_target;
-    long   nprocs;
+    int32_t nprocs;
     const char *machinefile;
     int8_t isinteractive;
     int8_t color;
@@ -1571,6 +1582,7 @@ typedef struct {
     int8_t fast_math;
     int8_t worker;
     const char *bindto;
+    int8_t handle_signals;
 } jl_options_t;
 
 extern DLLEXPORT jl_options_t jl_options;
@@ -1605,6 +1617,9 @@ extern DLLEXPORT jl_options_t jl_options;
 #define JL_OPTIONS_FAST_MATH_ON 1
 #define JL_OPTIONS_FAST_MATH_OFF 2
 #define JL_OPTIONS_FAST_MATH_DEFAULT 0
+
+#define JL_OPTIONS_HANDLE_SIGNALS_ON 1
+#define JL_OPTIONS_HANDLE_SIGNALS_OFF 0
 
 // Version information
 #include "julia_version.h"

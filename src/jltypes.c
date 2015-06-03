@@ -134,7 +134,7 @@ static int jl_has_typevars_from(jl_value_t *v, jl_svec_t *p)
     return jl_has_typevars__(v, 0, p);
 }
 
-int jl_has_typevars(jl_value_t *v)
+DLLEXPORT int jl_has_typevars(jl_value_t *v)
 {
     if (jl_is_typevar(v)) return 1;
     return jl_has_typevars__(v, 0, NULL);
@@ -843,6 +843,28 @@ static jl_value_t *intersect_typevar(jl_tvar_t *a, jl_value_t *b,
                     return ti;
                 }
                 break;
+            }
+        }
+        if (jl_is_typevar(b)) {
+            for(i=0; i < penv->n; i+=2) {
+                if (penv->data[i] == b && !jl_is_typevar(penv->data[i+1])) {
+                    jl_value_t *ti = jl_type_intersection((jl_value_t*)a, penv->data[i+1]);
+                    if (ti == (jl_value_t*)jl_bottom_type) {
+                        JL_GC_POP();
+                        return ti;
+                    }
+                    break;
+                }
+            }
+            for(i=0; i < eqc->n; i+=2) {
+                if (eqc->data[i] == b && !jl_is_typevar(eqc->data[i+1])) {
+                    jl_value_t *ti = jl_type_intersection((jl_value_t*)a, eqc->data[i+1]);
+                    if (ti == (jl_value_t*)jl_bottom_type) {
+                        JL_GC_POP();
+                        return ti;
+                    }
+                    break;
+                }
             }
         }
         extend((jl_value_t*)a, b, penv);
@@ -2445,17 +2467,16 @@ int jl_subtype_le(jl_value_t *a, jl_value_t *b, int ta, int invariant)
                     if (jl_subtype_le(a, jl_tparam0(b), 0, 1))
                         return 1;
                 }
-                if (invariant && ttb == (jl_datatype_t*)ttb->name->primary)
-                    return 0;
                 assert(jl_nparams(tta) == jl_nparams(ttb));
                 size_t l = jl_nparams(tta);
                 for(i=0; i < l; i++) {
                     jl_value_t *apara = jl_tparam(tta,i);
                     jl_value_t *bpara = jl_tparam(ttb,i);
-                    if (invariant && jl_is_typevar(bpara) &&
-                        !((jl_tvar_t*)bpara)->bound) {
-                        if (!jl_is_typevar(apara))
-                            return 0;
+                    if (invariant) {
+                        if (jl_is_typevar(bpara) && !((jl_tvar_t*)bpara)->bound) {
+                            if (!jl_is_typevar(apara))
+                                return 0;
+                        }
                     }
                     if (!jl_subtype_le(apara, bpara, 0, 1))
                         return 0;
@@ -2721,6 +2742,8 @@ int jl_type_morespecific(jl_value_t *a, jl_value_t *b)
 
 // ----------------------------------------------------------------------------
 
+int type_match_invariance_mask = 1;
+
 static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
                                cenv_t *env, int morespecific, int invariant);
 
@@ -2738,6 +2761,7 @@ static jl_value_t *tuple_match(jl_datatype_t *child, jl_datatype_t *parent,
     int cseq=0, pseq=0;
     jl_value_t *ce=NULL, *pe=NULL, *cn=NULL, *pn=NULL;
     int mode = 0;
+    invariant = invariant & type_match_invariance_mask;
     while(1) {
         if (!cseq)
             cseq = (ci<clenr) && clenkind != JL_TUPLE_FIXED && jl_is_vararg_type(jl_tparam(child,ci));
@@ -2808,6 +2832,7 @@ static jl_value_t *type_match_(jl_value_t *child, jl_value_t *parent,
                                cenv_t *env, int morespecific, int invariant)
 {
     jl_value_t *tmp, *tmp2;
+    invariant = invariant & type_match_invariance_mask;
     if (jl_is_typector(child))
         child = (jl_value_t*)((jl_typector_t*)child)->body;
     if (jl_is_typector(parent))
@@ -3184,6 +3209,7 @@ void jl_init_types(void)
     jl_type_type->parameters = jl_svec(1, tttvar);
 
     jl_tupletype_t *empty_tuple_type = jl_apply_tuple_type(jl_emptysvec);
+    empty_tuple_type->uid = jl_assign_type_uid();
     jl_emptytuple = ((jl_datatype_t*)empty_tuple_type)->instance;
 
     // non-primitive definitions follow
