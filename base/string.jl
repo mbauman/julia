@@ -77,7 +77,7 @@ sizeof(s::AbstractString) = error("type $(typeof(s)) has no canonical binary rep
 
 eltype{T<:AbstractString}(::Type{T}) = Char
 
-(*)(s::AbstractString...) = string(s...)
+(*)(s1::AbstractString, ss::AbstractString...) = string(s1, ss...)
 (^)(s::AbstractString, r::Integer) = repeat(s,r)
 
 length(s::DirectIndexString) = endof(s)
@@ -1722,7 +1722,7 @@ wstring(s::Cwstring) = wstring(box(Ptr{Cwchar_t}, unbox(Cwstring,s)))
 # to have WString
 function unsafe_convert(::Type{Cwstring}, s::WString)
     if containsnul(s)
-        throw(ArgumentError("embedded NUL chars are not allowed in C strings"))
+        throw(ArgumentError("embedded NUL chars are not allowed in C strings: $(repr(s))"))
     end
     return Cwstring(unsafe_convert(Ptr{Cwchar_t}, s))
 end
