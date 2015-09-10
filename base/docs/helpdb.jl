@@ -7412,11 +7412,11 @@ Alternatively, a sequence of pair arguments may be passed.
 Dict
 
 doc"""
-```rst
-..  sqrt(x)
+    sqrt(x)
 
-Return :math:`\sqrt{x}`. Throws ``DomainError`` for negative ``Real`` arguments. Use complex negative arguments instead.  The prefix operator ``√`` is equivalent to ``sqrt``.
-```
+Return $\sqrt{x}$. Throws `DomainError` for negative `Real` arguments. Use
+complex negative arguments instead.  The prefix operator `√` is equivalent to
+`sqrt`.
 """
 sqrt
 
