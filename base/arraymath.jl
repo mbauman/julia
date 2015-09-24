@@ -94,8 +94,8 @@ for (f,F) in ((:+,   AddFun()),
         end
         function ($f){S,T}(A::AbstractArray{S}, B::AbstractArray{T})
             F = similar(A, promote_op($F,S,T), promote_shape(size(A),size(B)))
-            for i in eachindex(A,B)
-                @inbounds F[i] = ($f)(A[i], B[i])
+            for (iA, iB, iF) in zip(eachindex(A), eachindex(B), eachindex(F))
+                @inbounds F[iF] = ($f)(A[iA], B[iB])
             end
             return F
         end
@@ -164,8 +164,8 @@ for f in (:+, :-)
     @eval begin
         function ($f)(A::StridedArray{Bool}, B::StridedArray{Bool})
             F = similar(A, Int, promote_shape(size(A), size(B)))
-            for i in eachindex(A,B)
-                @inbounds F[i] = ($f)(A[i], B[i])
+            for (iA, iB, iF) in zip(eachindex(A), eachindex(B), eachindex(F))
+                @inbounds F[iF] = ($f)(A[iA], B[iB])
             end
             return F
         end

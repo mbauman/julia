@@ -831,6 +831,9 @@ end
 
 # 0.5 deprecations
 
+@deprecate eachindex(A::AbstractArray, B::AbstractArray) zip(eachindex(A), eachindex(B))
+@deprecate eachindex(As::AbstractArray...) zip(map(eachindex, As)...)
+
 # 12839
 const AsyncStream = IO
 deprecate(:AsyncStream)

@@ -414,17 +414,6 @@ iterstate(i) = i
 eachindex(A::AbstractArray) = (@_inline_meta(); eachindex(linearindexing(A), A))
 eachindex(::LinearFast, A::AbstractArray) = 1:length(A)
 
-function eachindex(A::AbstractArray, B::AbstractArray)
-    @_inline_meta
-    eachindex(linearindexing(A,B), A, B)
-end
-function eachindex(A::AbstractArray, B::AbstractArray...)
-    @_inline_meta
-    eachindex(linearindexing(A,B...), A, B...)
-end
-eachindex(::LinearFast, A::AbstractArray, B::AbstractArray) = 1:max(length(A),length(B))
-eachindex(::LinearFast, A::AbstractArray, B::AbstractArray...) = 1:max(length(A), map(length, B)...)
-
 isempty(a::AbstractArray) = (length(a) == 0)
 
 ## Conversions ##
@@ -1028,8 +1017,8 @@ function isequal(A::AbstractArray, B::AbstractArray)
     if isa(A,Range) != isa(B,Range)
         return false
     end
-    for i in eachindex(A,B)
-        if !isequal(A[i], B[i])
+    for (iA, iB) in zip(eachindex(A), eachindex(B))
+        if !isequal(A[iA], B[iB])
             return false
         end
     end
@@ -1052,8 +1041,8 @@ function (==)(A::AbstractArray, B::AbstractArray)
     if isa(A,Range) != isa(B,Range)
         return false
     end
-    for i in eachindex(A,B)
-        if !(A[i]==B[i])
+    for (iA, iB) in zip(eachindex(A), eachindex(B))
+        if !(A[iA]==B[iB])
             return false
         end
     end
