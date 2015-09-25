@@ -3,7 +3,6 @@
 
 abstract AbstractRotation{T}
 
-transpose(R::AbstractRotation) = error("transpose not implemented for $(typeof(R)). Consider using conjugate transpose (') instead of transpose (.').")
 
 function *{T,S}(R::AbstractRotation{T}, A::AbstractVecOrMat{S})
     TS = typeof(zero(T)*zero(S) + zero(T)*zero(S))
@@ -30,9 +29,6 @@ convert{T}(::Type{Rotation{T}}, R::Rotation{T}) = R
 convert{T}(::Type{Rotation{T}}, R::Rotation) = Rotation{T}([convert(Givens{T}, g) for g in R.rotations])
 convert{T}(::Type{AbstractRotation{T}}, G::Givens) = convert(Givens{T}, G)
 convert{T}(::Type{AbstractRotation{T}}, R::Rotation) = convert(Rotation{T}, R)
-
-ctranspose(G::Givens) = Givens(G.i1, G.i2, conj(G.c), -G.s)
-ctranspose{T}(R::Rotation{T}) = Rotation{T}(reverse!([ctranspose(r) for r in R.rotations]))
 
 realmin2(::Type{Float32}) = reinterpret(Float32, 0x26000000)
 realmin2(::Type{Float64}) = reinterpret(Float64, 0x21a0000000000000)
