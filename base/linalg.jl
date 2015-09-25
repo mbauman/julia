@@ -6,7 +6,7 @@ importall Base
 importall ..Base.Operators
 import Base: USE_BLAS64, size, copy, copy_transpose!, power_by_squaring,
              print_matrix, transpose!, unsafe_getindex, unsafe_setindex!,
-             isapprox
+             isapprox, untranspose
 
 export
 # Modules
@@ -127,31 +127,14 @@ export
     \,
     /,
     A_ldiv_B!,
-    A_ldiv_Bc,
-    A_ldiv_Bt,
     A_mul_B!,
-    A_mul_Bc,
     A_mul_Bc!,
-    A_mul_Bt,
     A_mul_Bt!,
-    A_rdiv_Bc,
-    A_rdiv_Bt,
-    Ac_ldiv_B,
-    Ac_ldiv_Bc,
-    Ac_mul_B,
     Ac_mul_B!,
-    Ac_mul_Bc,
     Ac_mul_Bc!,
-    Ac_rdiv_B,
-    Ac_rdiv_Bc,
-    At_ldiv_B,
-    At_ldiv_Bt,
-    At_mul_B,
     At_mul_B!,
-    At_mul_Bt,
     At_mul_Bt!,
-    At_rdiv_B,
-    At_rdiv_Bt,
+    mul!,
 
 # Constants
     I
