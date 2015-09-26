@@ -834,3 +834,19 @@ end
 # 12839
 const AsyncStream = IO
 deprecate(:AsyncStream)
+
+# transposes
+@deprecate Ac_mul_B(a,b)   ctranspose(a)*b
+@deprecate A_mul_Bc(a,b)   a*ctranspose(b)
+@deprecate Ac_mul_Bc(a,b)  ctranspose(a)*ctranspose(b)
+@deprecate At_mul_B(a,b)   transpose(a)*b
+@deprecate A_mul_Bt(a,b)   a*transpose(b)
+@deprecate At_mul_Bt(a,b)  transpose(a)*transpose(b)
+
+@deprecate A_mul_B!(c,a,b)    mul!(c,a,b)
+@deprecate Ac_mul_B!(c,a,b)   mul!(c,a',b)
+@deprecate A_mul_Bc!(c,a,b)   mul!(c,a,b')
+@deprecate Ac_mul_Bc!(c,a,b)  mul!(c,a',b')
+@deprecate At_mul_B!(c,a,b)   mul!(c,a.',b)
+@deprecate A_mul_Bt!(c,a,b)   mul!(c,a,b.')
+@deprecate At_mul_Bt!(c,a,b)  mul!(c,a.',b.')
