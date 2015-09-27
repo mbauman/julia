@@ -118,6 +118,7 @@ export
     SubString,
     Symmetric,
     SymTridiagonal,
+    TensorTranspose,
     Timer,
     Tridiagonal,
     UnitRange,
