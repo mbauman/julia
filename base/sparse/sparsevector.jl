@@ -334,30 +334,157 @@ sprand{T}(n::Integer, p::AbstractFloat, ::Type{T}) = sprand(n, p, rand, T)
 sprand(n::Integer, p::AbstractFloat) = sprand(n, p, rand)
 sprandn(n::Integer, p::AbstractFloat) = sprand(n, p, randn)
 
-## Indexing
+## Indexing into Matrices can return SparseVectors
 
-jvec_rgn(x::Vector, first::Int, n::Int) = pointer_to_array(pointer(x, first), n, false)
-
-function getcol(x::SparseMatrixCSC, j::Integer)
-    1 <= j <= x.n || throw(BoundsError())
+function getindex(x::SparseMatrixCSC, ::Colon, j::Integer)
+    checkbounds(x, :, j)
     r1 = convert(Int, x.colptr[j])
     r2 = convert(Int, x.colptr[j+1]) - 1
     SparseVector(x.m, x.rowval[r1:r2], x.nzval[r1:r2])
 end
 
-function unsafe_colrange{Tv,Ti}(x::SparseMatrixCSC{Tv,Ti}, J::UnitRange)
-    jfirst = first(J)
-    jlast = last(J)
-    (1 <= jfirst <= x.n && jlast <= x.n) || throw(BoundsError())
-    r1 = x.colptr[jfirst]
-    r2 = x.colptr[jlast+1] - one(r1)
-    newcolptr = sub(x.colptr, jfirst:jlast+1) - (r1 - one(r1))
-
-    fi = convert(Int, r1)
-    nc = convert(Int, r2 - r1) + 1
-    SparseMatrixCSC{Tv, Ti}(x.m, length(J), newcolptr,
-        jvec_rgn(x.rowval, fi, nc), jvec_rgn(x.nzval, fi, nc))
+function getindex(x::SparseMatrixCSC, I::UnitRange, j::Integer)
+    checkbounds(x, I, j)
+    # Get the selected column
+    c1 = convert(Int, x.colptr[j])
+    c2 = convert(Int, x.colptr[j+1]) - 1
+    # Restrict to the selected rows
+    r1 = searchsortedfirst(x.rowval, first(I), c1, c2, Forward)
+    r2 = searchsortedlast(x.rowval, last(I), c1, c2, Forward)
+    SparseVector(length(I), x.rowval[r1:r2], x.nzval[r1:r2])
 end
+
+function getindex{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, I::AbstractArray, j::Integer)
+    # Cribbed from the SparseMatrix getindex_I_sorted_bsearch_A
+    checkbounds(A, I, j)
+    const nI = length(I)
+
+    colptrA = A.colptr; rowvalA = A.rowval; nzvalA = A.nzval
+
+    ptrS = 1
+    # determine result size
+    let
+        col = j
+        ptrI::Int = 1 # runs through I
+        ptrA::Int = colptrA[col]
+        stopA::Int = colptrA[col+1]-1
+        if ptrA <= stopA
+            while ptrI <= nI
+                rowI = I[ptrI]
+                ptrI += 1
+                (rowvalA[ptrA] > rowI) && continue
+                ptrA = searchsortedfirst(rowvalA, rowI, ptrA, stopA, Base.Order.Forward)
+                (ptrA <= stopA) || break
+                if rowvalA[ptrA] == rowI
+                    ptrS += 1
+                end
+            end
+        end
+    end
+    rowvalS = Array(Ti, ptrS-1)
+    nzvalS  = Array(Tv, ptrS-1)
+
+    # fill the values
+    let
+        ptrS = 1
+        col = j
+        ptrI::Int = 1 # runs through I
+        ptrA::Int = colptrA[col]
+        stopA::Int = colptrA[col+1]-1
+        if ptrA <= stopA
+            while ptrI <= nI
+                rowI = I[ptrI]
+                if rowvalA[ptrA] <= rowI
+                    ptrA = searchsortedfirst(rowvalA, rowI, ptrA, stopA, Base.Order.Forward)
+                    (ptrA <= stopA) || break
+                    if rowvalA[ptrA] == rowI
+                        rowvalS[ptrS] = ptrI
+                        nzvalS[ptrS] = nzvalA[ptrA]
+                        ptrS += 1
+                    end
+                end
+                ptrI += 1
+            end
+        end
+    end
+    return SparseVector(nI, rowvalS, nzvalS)
+end
+
+# Logical and linear indexing into SparseMatrices
+getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractVector{Bool}) = _logical_index(A, I) # Ambiguities
+getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractArray{Bool}) = _logical_index(A, I)
+function _logical_index{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractArray{Bool})
+    checkbounds(A, I)
+    n = sum(I)
+
+    colptrA = A.colptr; rowvalA = A.rowval; nzvalA = A.nzval
+    rowvalB = Array(Int, n)
+    nzvalB = Array(Tv, n)
+    c = 1
+    rowB = 1
+
+    @inbounds for col in 1:A.n
+        r1 = colptrA[col]
+        r2 = colptrA[col+1]-1
+
+        for row in 1:A.m
+            if I[row, col]
+                while (r1 <= r2) && (rowvalA[r1] < row)
+                    r1 += 1
+                end
+                if (r1 <= r2) && (rowvalA[r1] == row)
+                    nzvalB[c] = nzvalA[r1]
+                    rowvalB[c] = rowB
+                    c += 1
+                end
+                rowB += 1
+                (rowB > n) && break
+            end
+        end
+        (rowB > n) && break
+    end
+    n = length(nzvalB)
+    if n > (c-1)
+        deleteat!(nzvalB, c:n)
+        deleteat!(rowvalB, c:n)
+    end
+    SparseVector(n, rowvalB, nzvalB)
+end
+
+# TODO: further optimizations are available for I::Range
+function getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractVector)
+    szA = size(A)
+    nA = szA[1]*szA[2]
+    colptrA = A.colptr
+    rowvalA = A.rowval
+    nzvalA = A.nzval
+
+    n = length(I)
+    rowvalB = Array(Int, n)
+    nzvalB = Array(Tv, n)
+
+    rowB = 1
+    idxB = 1
+
+    for i in 1:n
+        ((I[i] < 1) | (I[i] > nA)) && throw(BoundsError(A, I))
+        row,col = ind2sub(szA, I[i])
+        for r in colptrA[col]:(colptrA[col+1]-1)
+            @inbounds if rowvalA[r] == row
+                rowvalB[idxB] = i
+                nzvalB[idxB] = nzvalA[r]
+                idxB += 1
+                break
+            end
+        end
+    end
+    if n > (idxB-1)
+        deleteat!(nzvalB, idxB:n)
+        deleteat!(rowvalB, idxB:n)
+    end
+    SparseVector(n, rowvalB, nzvalB)
+end
+
 
 ### generics.jl
 # Generic functions operating on AbstractSparseVector

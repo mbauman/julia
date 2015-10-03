@@ -284,28 +284,33 @@ let S = sprand(4, 8, 0.5)
     @assert isa(Sf, Matrix{Float64})
 
     # get a single column
-    # for j = 1:size(S,2)
-    #     col = getcol(S, j)
-    #     @test isa(col, SparseVector{Float64,Int})
-    #     @test length(col) == size(S,1)
-    #     @test full(col) == Sf[:,j]
-    # end
-    #
-    # # non-empty range
-    # V = unsafe_colrange(S, 2:6)
-    # @test isa(V, SparseMatrixCSC{Float64,Int})
-    # @test size(V) == (4, 5)
-    # @test full(V) == Sf[:, 2:6]
-    # @test !isempty(V)
-    #
-    # # empty range
-    # V0 = unsafe_colrange(S, 2:1)
-    # @test isa(V0, SparseMatrixCSC{Float64,Int})
-    # @test size(V0) == (4, 0)
-    # @test isempty(V0)
+    for j = 1:size(S,2)
+        col = S[:, j]
+        @test isa(col, SparseVector{Float64,Int})
+        @test length(col) == size(S,1)
+        @test full(col) == Sf[:,j]
+    end
 
+    # Get a reshaped vector
+    v = S[:]
+    @test isa(v, SparseVector{Float64,Int})
+    @test length(v) == length(S)
+    @test full(v) == Sf[:]
+
+    # Get a linear subset
+    for i=0:length(S)
+        v = S[1:i]
+        @test isa(v, SparseVector{Float64,Int})
+        @test length(v) == i
+        @test full(v) == Sf[1:i]
+    end
+    for i=1:length(S)+1
+        v = S[i:end]
+        @test isa(v, SparseVector{Float64,Int})
+        @test length(v) == length(S) - i + 1
+        @test full(v) == Sf[i:end]
+    end
 end
-
 
 ## math.jl
 

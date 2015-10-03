@@ -1336,13 +1336,10 @@ function getindex{T}(A::SparseMatrixCSC{T}, i0::Integer, i1::Integer)
     ((r1 > r2) || (A.rowval[r1] != i0)) ? zero(T) : A.nzval[r1]
 end
 
-getindex{T<:Integer}(A::SparseMatrixCSC, I::AbstractVector{T}, j::Integer) = getindex(A,I,[j])
 getindex{T<:Integer}(A::SparseMatrixCSC, i::Integer, J::AbstractVector{T}) = getindex(A,[i],J)
 
-# Colon translation (this could be done more efficiently)
-getindex(A::SparseMatrixCSC, ::Colon)          = getindex(A, 1:length(A))
-getindex(A::SparseMatrixCSC, ::Colon, ::Colon) = getindex(A, 1:size(A, 1), 1:size(A, 2))
-getindex(A::SparseMatrixCSC, ::Colon, j)       = getindex(A, 1:size(A, 1), j)
+# Colon translation
+getindex(A::SparseMatrixCSC, ::Colon, ::Colon) = copy(A)
 getindex(A::SparseMatrixCSC, i, ::Colon)       = getindex(A, i, 1:size(A, 2))
 
 function getindex_cols{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, J::AbstractVector)
@@ -1747,46 +1744,6 @@ getindex(A::SparseMatrixCSC, I::AbstractVector{Bool}, J::Integer) = A[find(I),J]
 getindex(A::SparseMatrixCSC, I::AbstractVector{Bool}, J::AbstractVector{Bool}) = A[find(I),find(J)]
 getindex{T<:Integer}(A::SparseMatrixCSC, I::AbstractVector{T}, J::AbstractVector{Bool}) = A[I,find(J)]
 getindex{T<:Integer}(A::SparseMatrixCSC, I::AbstractVector{Bool}, J::AbstractVector{T}) = A[find(I),J]
-
-function getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractArray{Bool})
-    checkbounds(A, I)
-    n = sum(I)
-
-    colptrA = A.colptr; rowvalA = A.rowval; nzvalA = A.nzval
-    colptrB = Int[1,n+1]
-    rowvalB = Array(Int, n)
-    nzvalB = Array(Tv, n)
-    c = 1
-    rowB = 1
-
-    @inbounds for col in 1:A.n
-        r1 = colptrA[col]
-        r2 = colptrA[col+1]-1
-
-        for row in 1:A.m
-            if I[row, col]
-                while (r1 <= r2) && (rowvalA[r1] < row)
-                    r1 += 1
-                end
-                if (r1 <= r2) && (rowvalA[r1] == row)
-                    nzvalB[c] = nzvalA[r1]
-                    rowvalB[c] = rowB
-                    c += 1
-                end
-                rowB += 1
-                (rowB > n) && break
-            end
-        end
-        (rowB > n) && break
-    end
-    colptrB[end] = c
-    n = length(nzvalB)
-    if n > (c-1)
-        deleteat!(nzvalB, c:n)
-        deleteat!(rowvalB, c:n)
-    end
-    SparseMatrixCSC(n, 1, colptrB, rowvalB, nzvalB)
-end
 
 ## setindex!
 function setindex!{T,Ti}(A::SparseMatrixCSC{T,Ti}, v, i0::Integer, i1::Integer)
