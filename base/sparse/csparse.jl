@@ -314,6 +314,8 @@ function csc_permute{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, pinv::Vector{Ti}, q::Vect
 end
 
 
+# based on cs_symperm p. 21, "Direct Methods for Sparse Linear Systems"
+# form A[p,p] for a symmetric A stored in the upper triangle
 doc"""
     symperm(A, p)
 
@@ -322,10 +324,6 @@ symmetric and sparse, where only the upper triangular part of the matrix is
 stored. This algorithm ignores the lower triangular part of the matrix. Only the
 upper triangular part of the result is returned as well.
 """
-symperm
-
-# based on cs_symperm p. 21, "Direct Methods for Sparse Linear Systems"
-# form A[p,p] for a symmetric A stored in the upper triangle
 function symperm{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, pinv::Vector{Ti})
     m, n = size(A)
     if m != n

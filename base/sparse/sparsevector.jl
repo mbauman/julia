@@ -46,6 +46,8 @@ countnz(x::SparseVector) = countnz(x.nzval)
 nonzeros(x::SparseVector) = x.nzval
 nonzeroinds(x::SparseVector) = x.nzind
 
+similar{T}(x::SparseVector, ::Type{T}, D::Dims) = spzeros(T, D...)
+
 ### Construct empty sparse vector
 
 spzeros{T}(::Type{T}, len::Integer) = SparseVector(len, Int[], T[])
@@ -143,7 +145,7 @@ function sparsevec{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv},
         throw(DimensionMismatch("The lengths of I and V are inconsistent."))
     maxi = convert(Ti, len)
     for i in I
-        1 <= i <= maxi || error("An index is out of bound.")
+        1 <= i <= maxi || throw(ArgumentError("An index is out of bound."))
     end
     _sparsevector!(collect(Ti, I), collect(Tv, V), len, combine)
 end
@@ -268,7 +270,7 @@ convert{Tv,Ti}(::Type{SparseVector}, s::SparseMatrixCSC{Tv,Ti}) =
 Convert a vector `A` into a sparse vector of size `m`. In julia,
 sparse vectors are really just sparse matrices with one column.
 """
-sparsevec(a::AbstractVector) = convert(SparseVector{T, Int}, a)
+sparsevec{T}(a::AbstractVector{T}) = convert(SparseVector{T, Int}, a)
 sparse(a::AbstractVector) = sparsevec(a)
 
 function _dense2sparsevec{Tv,Ti}(s::AbstractVector{Tv}, initcap::Ti)
@@ -343,7 +345,7 @@ function getindex(x::SparseMatrixCSC, ::Colon, j::Integer)
     SparseVector(x.m, x.rowval[r1:r2], x.nzval[r1:r2])
 end
 
-function getindex(x::SparseMatrixCSC, I::UnitRange, j::Integer)
+function Base.getindex(x::SparseMatrixCSC, I::UnitRange, j::Integer)
     checkbounds(x, I, j)
     # Get the selected column
     c1 = convert(Int, x.colptr[j])
@@ -351,7 +353,7 @@ function getindex(x::SparseMatrixCSC, I::UnitRange, j::Integer)
     # Restrict to the selected rows
     r1 = searchsortedfirst(x.rowval, first(I), c1, c2, Forward)
     r2 = searchsortedlast(x.rowval, last(I), c1, c2, Forward)
-    SparseVector(length(I), x.rowval[r1:r2], x.nzval[r1:r2])
+    SparseVector(length(I), x.rowval[r1:r2] - first(I) + 1, x.nzval[r1:r2])
 end
 
 function getindex{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, I::AbstractArray, j::Integer)
@@ -496,14 +498,16 @@ function _spgetindex{Tv,Ti}(m::Int, nzind::AbstractVector{Ti}, nzval::AbstractVe
     (ii <= m && nzind[ii] == i) ? nzval[ii] : zero(Tv)
 end
 
-getindex{Tv}(x::AbstractSparseVector{Tv}, i::Integer) =
+function getindex{Tv}(x::AbstractSparseVector{Tv}, i::Integer)
+    checkbounds(x, i)
     _spgetindex(nnz(x), nonzeroinds(x), nonzeros(x), i)
+end
 
 function getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::UnitRange)
+    checkbounds(x, I)
     xlen = length(x)
     i0 = first(I)
     i1 = last(I)
-    (i0 >= 1 && i1 <= xlen) || throw(BoundsError())
 
     xnzind = nonzeroinds(x)
     xnzval = nonzeros(x)
@@ -536,7 +540,10 @@ function getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::UnitRange)
     SparseVector(length(I), rind, rval)
 end
 
-function getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::AbstractArray)
+getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::AbstractVector{Bool}) = x[find(I)]
+getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::AbstractArray{Bool}) = x[find(I)]
+function getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::AbstractVector)
+    checkbounds(x, I)
     xnzind = nonzeroinds(x)
     xnzval = nonzeros(x)
     m = length(xnzind)
@@ -558,6 +565,9 @@ function getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::AbstractArray)
     end
     SparseVector(n, nzind, nzval)
 end
+
+# TODO: do this without reshaping
+getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::AbstractArray) = reshape(x[vec(I)], size(I))
 
 ### show and friends
 
