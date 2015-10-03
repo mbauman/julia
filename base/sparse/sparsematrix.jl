@@ -1041,6 +1041,7 @@ end # macro
 (.^)(A::SparseMatrixCSC, B::Number) =
     B==0 ? sparse(ones(typeof(one(eltype(A)).^B), A.m, A.n)) :
            SparseMatrixCSC(A.m, A.n, copy(A.colptr), copy(A.rowval), A.nzval .^ B)
+(.^)(::Irrational{:e}, B::SparseMatrixCSC) = exp(B)
 (.^)(A::Number, B::SparseMatrixCSC) = (.^)(A, full(B))
 (.^)(A::SparseMatrixCSC, B::Array) = (.^)(full(A), B)
 (.^)(A::Array, B::SparseMatrixCSC) = (.^)(A, full(B))

@@ -160,7 +160,7 @@ function spmatmul{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, B::SparseMatrixCSC{Tv,Ti};
 
     # The Gustavson algorithm does not guarantee the product to have sorted row indices.
     Cunsorted = SparseMatrixCSC(mA, nB, colptrC, rowvalC, nzvalC)
-    C = Base.SparseMatrix.sortSparseMatrixCSC!(Cunsorted, sortindices=sortindices)
+    C = SparseMatrix.sortSparseMatrixCSC!(Cunsorted, sortindices=sortindices)
     return C
 end
 
