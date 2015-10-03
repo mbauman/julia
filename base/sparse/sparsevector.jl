@@ -1,27 +1,6 @@
 ### common.jl
 
-# not exported, used mainly for testing
-
-_copy_convert{T}(::Type{T}, x::Vector{T}) = copy(x)
-_copy_convert{R,T}(::Type{R}, x::AbstractVector{T}) = convert(Vector{R}, x)
-
 import Base: Func, AddFun, MulFun, MaxFun, MinFun
-
-if isdefined(Base, :call)
-    import Base: call
-else
-    call(f::Function, x) = f(x)
-    call(f::Function, x, y) = f(x, y)
-    call(f::Func{1}, x) = Base.evaluate(f, x)
-    call(f::Func{2}, x, y) = Base.evaluate(f, x, y)
-end
-
-if isdefined(Base, :SubFun)
-    import Base: SubFun
-else
-    immutable SubFun <: Func{2} end
-    call(::SubFun, x, y) = x - y
-end
 
 immutable RealFun <: Func{1} end
 call(::RealFun, x) = real(x)
@@ -33,13 +12,10 @@ immutable ComplexFun <: Func{2} end
 call(::ComplexFun, x::Real, y::Real) = complex(x, y)
 
 immutable DotFun <: Func{2} end
-_dot(x::Number, y::Number) = conj(x) * y
-_dot(x::Real, y::Real) = x * y
-call(::DotFun, x::Number, y::Number) = _dot(x, y)
+call(::DotFun, x::Number, y::Number) = conj(x) * y
 
-typealias UnaryOp Union(Function, Func{1})
-typealias BinaryOp Union(Function, Func{2})
-
+typealias UnaryOp Union{Function, Func{1}}
+typealias BinaryOp Union{Function, Func{2}}
 
 ### sparsevec.jl
 
@@ -149,7 +125,7 @@ function sparsevector{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{T
             len = i
         end
     end
-    _sparsevector!(_copy_convert(Ti, I), _copy_convert(Tv, V), len, combine)
+    _sparsevector!(collect(Ti, I), collect(Tv, V), len, combine)
 end
 
 function sparsevector{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, len::Integer, combine::BinaryOp)
@@ -159,7 +135,7 @@ function sparsevector{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{T
     for i in I
         1 <= i <= maxi || error("An index is out of bound.")
     end
-    _sparsevector!(_copy_convert(Ti, I), _copy_convert(Tv, V), len, combine)
+    _sparsevector!(collect(Ti, I), collect(Tv, V), len, combine)
 end
 
 sparsevector{Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector) =
@@ -536,8 +512,8 @@ function convert{TvD,TiD,Tv,Ti}(::Type{SparseMatrixCSC{TvD,TiD}}, x::AbstractSpa
     xnzval = nonzeros(x)
     m = length(xnzind)
     colptr = TiD[1, m+1]
-    rowval = _copy_convert(TiD, xnzind)
-    nzval = _copy_convert(TvD, xnzval)
+    rowval = collect(TiD, xnzind)
+    nzval = collect(TvD, xnzval)
     SparseMatrixCSC(n, 1, colptr, rowval, nzval)
 end
 
