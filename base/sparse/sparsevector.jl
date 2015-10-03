@@ -310,60 +310,9 @@ sprand{T}(n::Integer, p::FloatingPoint, ::Type{T}) = sprand(n, p, rand, T)
 sprand(n::Integer, p::FloatingPoint) = sprand(n, p, rand)
 sprandn(n::Integer, p::FloatingPoint) = sprand(n, p, randn)
 
-
-### sparsevecview.jl
-
-using ArrayViews
-import ArrayViews: view
-
-typealias CVecView{T} ContiguousView{T,1,Vector{T}}
-
-immutable SparseVectorView{Tv,Ti<:Integer} <: AbstractSparseVector{Tv,Ti}
-    n::Int                  # the number of elements
-    nzind::CVecView{Ti}     # the indices of nonzeros
-    nzval::CVecView{Tv}     # the values of nonzeros
-
-    function SparseVectorView(n::Integer, nzind::CVecView{Ti}, nzval::CVecView{Tv})
-        n >= 0 || throw(ArgumentError("The number of elements must be non-negative."))
-        length(nzind) == length(nzval) ||
-            throw(DimensionMismatch("The lengths of nzind and nzval are inconsistent."))
-        new(convert(Int, n), nzind, nzval)
-    end
-end
-
-### Construction
-
-SparseVectorView{Tv,Ti}(n::Integer, nzind::CVecView{Ti}, nzval::CVecView{Tv}) =
-    SparseVectorView{Tv,Ti}(n, nzind, nzval)
-
-view(x::AbstractSparseVector) =
-    SparseVectorView(length(x), view(nonzeroinds(x)), view(nonzeros(x)))
-
-### Basic properties
-
-length(x::SparseVectorView) = x.n
-size(x::SparseVectorView) = (x.n,)
-nnz(x::SparseVectorView) = length(x.nzval)
-countnz(x::SparseVectorView) = countnz(x.nzval)
-nonzeros(x::SparseVectorView) = x.nzval
-nonzeroinds(x::SparseVectorView) = x.nzind
-
-### sparsematview.jl
-
-
-### Views
+## Indexing
 
 jvec_rgn(x::Vector, first::Int, n::Int) = pointer_to_array(pointer(x, first), n, false)
-
-as_jvec{T}(x::ContiguousView{T,1,Vector{T}}) = pointer_to_array(pointer(x), length(x), false)
-
-function view(x::SparseMatrixCSC, ::Colon, j::Integer)
-    1 <= j <= x.n || throw(BoundsError())
-    r1 = convert(Int, x.colptr[j])
-    r2 = convert(Int, x.colptr[j+1]) - 1
-    rgn = r1:r2
-    SparseVectorView(x.m, view(x.rowval, rgn), view(x.nzval, rgn))
-end
 
 function getcol(x::SparseMatrixCSC, j::Integer)
     1 <= j <= x.n || throw(BoundsError())
@@ -378,7 +327,7 @@ function unsafe_colrange{Tv,Ti}(x::SparseMatrixCSC{Tv,Ti}, J::UnitRange)
     (1 <= jfirst <= x.n && jlast <= x.n) || throw(BoundsError())
     r1 = x.colptr[jfirst]
     r2 = x.colptr[jlast+1] - one(r1)
-    newcolptr = view(x.colptr, jfirst:jlast+1) - (r1 - one(r1))
+    newcolptr = sub(x.colptr, jfirst:jlast+1) - (r1 - one(r1))
 
     fi = convert(Int, r1)
     nc = convert(Int, r2 - r1) + 1

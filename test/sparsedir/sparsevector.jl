@@ -3,18 +3,11 @@
 ### Data
 
 spv_x1 = SparseVector(8, [2, 5, 6], [1.25, -0.75, 3.5])
-_x2 = SparseVector(8, [1, 2, 6, 7], [3.25, 4.0, -5.5, -6.0])
-spv_x2 = view(_x2)
 
 @test isa(spv_x1, SparseVector{Float64,Int})
-@test isa(spv_x2, SparseVectorView{Float64,Int})
 
 x1_full = zeros(length(spv_x1))
 x1_full[nonzeroinds(spv_x1)] = nonzeros(spv_x1)
-
-x2_full = zeros(length(spv_x2))
-x2_full[nonzeroinds(spv_x2)] = nonzeros(spv_x2)
-
 
 ### Basic Properties
 
@@ -33,24 +26,9 @@ let x = spv_x1
     @test nonzeros(x) == [1.25, -0.75, 3.5]
 end
 
-let x = spv_x2
-    @test eltype(x) == Float64
-    @test ndims(x) == 1
-    @test length(x) == 8
-    @test size(x) == (8,)
-    @test size(x,1) == 8
-    @test size(x,2) == 1
-    @test !isempty(x)
-
-    @test countnz(x) == 4
-    @test nnz(x) == 4
-    @test nonzeroinds(x) == [1, 2, 6, 7]
-    @test nonzeros(x) == [3.25, 4.0, -5.5, -6.0]
-end
-
 # full
 
-for (x, xf) in [(spv_x1, x1_full), (spv_x2, x2_full)]
+for (x, xf) in [(spv_x1, x1_full)]
     @test isa(full(x), Vector{Float64})
     @test full(x) == xf
 end
@@ -151,24 +129,10 @@ end
 # getindex
 
 # single integer index
-for (x, xf) in [(spv_x1, x1_full), (spv_x2, x2_full)]
+for (x, xf) in [(spv_x1, x1_full)]
     for i = 1:length(x)
         @test x[i] == xf[i]
     end
-end
-
-# range index
-let x = spv_x2
-    # range that contains no non-zeros
-    @test exact_equal(x[3:2], sparsevector(Float64, 0))
-    @test exact_equal(x[3:3], sparsevector(Float64, 1))
-    @test exact_equal(x[3:5], sparsevector(Float64, 3))
-
-    # range with non-zeros
-    @test exact_equal(x[1:length(x)], x)
-    @test exact_equal(x[1:5], SparseVector(5, [1,2], [3.25, 4.0]))
-    @test exact_equal(x[2:6], SparseVector(5, [1,5], [4.0, -5.5]))
-    @test exact_equal(x[2:8], SparseVector(7, [1,5,6], [4.0, -5.5, -6.0]))
 end
 
 # generic array index
@@ -318,16 +282,6 @@ let S = sprand(4, 8, 0.5)
         @test full(col) == Sf[:,j]
     end
 
-    # column views
-    for j = 1:size(S,2)
-        col = view(S, :, j)
-        @test isa(col, SparseVectorView{Float64,Int})
-        @test length(col) == size(S,1)
-        @test full(col) == Sf[:,j]
-    end
-
-    # column-range views
-
     # non-empty range
     V = unsafe_colrange(S, 2:6)
     @test isa(V, SparseMatrixCSC{Float64,Int})
@@ -355,13 +309,10 @@ rnd_x1 = sprand(50, 0.7) * 4.0
 rnd_x1f = full(rnd_x1)
 
 spv_x1 = SparseVector(8, [2, 5, 6], [1.25, -0.75, 3.5])
-_x2 = SparseVector(8, [1, 2, 6, 7], [3.25, 4.0, -5.5, -6.0])
-spv_x2 = view(_x2)
-
 
 ### Arithmetic operations
 
-let x = spv_x1, x2 = spv_x2
+let x = spv_x1
     # negate
     @test exact_equal(-x, SparseVector(8, [2, 5, 6], [-1.25, 0.75, -3.5]))
 
@@ -406,7 +357,7 @@ end
 
 ### Complex
 
-let x = spv_x1, x2 = spv_x2
+let x = spv_x1
     # complex
     @test exact_equal(complex(x, x),
         SparseVector(8, [2,5,6], [1.25+1.25im, -0.75-0.75im, 3.5+3.5im]))
