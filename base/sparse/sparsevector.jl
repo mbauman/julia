@@ -1,6 +1,6 @@
 ### common.jl
 
-import Base: Func, AddFun, MulFun, MaxFun, MinFun
+import Base: Func, AddFun, MulFun, MaxFun, MinFun, SubFun
 
 immutable RealFun <: Func{1} end
 call(::RealFun, x) = real(x)
@@ -48,7 +48,7 @@ nonzeroinds(x::SparseVector) = x.nzind
 
 ### Construct empty sparse vector
 
-sparsevector{T}(::Type{T}, len::Integer) = SparseVector(len, Int[], T[])
+spzeros{T}(::Type{T}, len::Integer) = SparseVector(len, Int[], T[])
 
 ### Construction from lists of indices and values
 
@@ -115,7 +115,17 @@ function _sparsevector!{Tv,Ti<:Integer}(I::Vector{Ti}, V::Vector{Tv}, len::Integ
     SparseVector(len, I, V)
 end
 
-function sparsevector{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, combine::BinaryOp)
+"""
+    sparsevec(I, V, [m, combine])
+
+Create a sparse matrix `S` of size `m x 1` such that `S[I[k]] = V[k]`.
+Duplicates are combined using the `combine` function, which defaults to
+`+` if it is not provided. In julia, sparse vectors are really just sparse
+matrices with one column. Given Julia's Compressed Sparse Columns (CSC)
+storage format, a sparse column matrix with one column is sparse, whereas
+a sparse row matrix with one row ends up being dense.
+"""
+function sparsevec{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, combine::BinaryOp)
     length(I) == length(V) ||
         throw(DimensionMismatch("The lengths of I and V are inconsistent."))
     len = 0
@@ -128,7 +138,7 @@ function sparsevector{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{T
     _sparsevector!(collect(Ti, I), collect(Tv, V), len, combine)
 end
 
-function sparsevector{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, len::Integer, combine::BinaryOp)
+function sparsevec{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, len::Integer, combine::BinaryOp)
     length(I) == length(V) ||
         throw(DimensionMismatch("The lengths of I and V are inconsistent."))
     maxi = convert(Ti, len)
@@ -138,28 +148,33 @@ function sparsevector{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{T
     _sparsevector!(collect(Ti, I), collect(Tv, V), len, combine)
 end
 
-sparsevector{Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector) =
-    sparsevector(I, V, AddFun())
+sparsevec{Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector) =
+    sparsevec(I, V, AddFun())
 
-sparsevector{Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector, len::Integer) =
-    sparsevector(I, V, len, AddFun())
+sparsevec{Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector, len::Integer) =
+    sparsevec(I, V, len, AddFun())
 
-sparsevector{Ti<:Integer}(I::AbstractVector{Ti}, v::Number, combine::BinaryOp) =
-    sparsevector(I, fill(v, length(I)), combine)
+sparsevec{Ti<:Integer}(I::AbstractVector{Ti}, v::Number, combine::BinaryOp) =
+    sparsevec(I, fill(v, length(I)), combine)
 
-sparsevector{Ti<:Integer}(I::AbstractVector{Ti}, v::Number, len::Integer, combine::BinaryOp) =
-    sparsevector(I, fill(v, length(I)), len, combine)
+sparsevec{Ti<:Integer}(I::AbstractVector{Ti}, v::Number, len::Integer, combine::BinaryOp) =
+    sparsevec(I, fill(v, length(I)), len, combine)
 
-sparsevector{Ti<:Integer}(I::AbstractVector{Ti}, v::Number) =
-    sparsevector(I, v, AddFun())
+sparsevec{Ti<:Integer}(I::AbstractVector{Ti}, v::Number) =
+    sparsevec(I, v, AddFun())
 
-sparsevector{Ti<:Integer}(I::AbstractVector{Ti}, v::Number, len::Integer) =
-    sparsevector(I, v, len, AddFun())
+sparsevec{Ti<:Integer}(I::AbstractVector{Ti}, v::Number, len::Integer) =
+    sparsevec(I, v, len, AddFun())
 
 
 ### Construction from dictionary
+"""
+    sparsevec(D::Dict, [m])
 
-function sparsevector{Tv,Ti<:Integer}(dict::Associative{Ti,Tv})
+Create a sparse vector of length `m` where the nonzero indices are keys from
+the dictionary, and the nonzero values are the values from the dictionary.
+"""
+function sparsevec{Tv,Ti<:Integer}(dict::Associative{Ti,Tv})
     m = length(dict)
     nzind = Array(Ti, m)
     nzval = Array(Tv, m)
@@ -182,7 +197,7 @@ function sparsevector{Tv,Ti<:Integer}(dict::Associative{Ti,Tv})
     _sparsevector!(nzind, nzval, len)
 end
 
-function sparsevector{Tv,Ti<:Integer}(dict::Associative{Ti,Tv}, len::Integer)
+function sparsevec{Tv,Ti<:Integer}(dict::Associative{Ti,Tv}, len::Integer)
     m = length(dict)
     nzind = Array(Ti, m)
     nzval = Array(Tv, m)
@@ -247,11 +262,20 @@ convert{Tv,Ti}(::Type{SparseVector}, s::SparseMatrixCSC{Tv,Ti}) =
 
 # convert Vector to SparseVector
 
-function _dense2sparsevec{Tv}(s::Vector{Tv}, initcap::Int)
-    # pre-condition: initcap > 0
+"""
+    sparsevec(A)
+
+Convert a vector `A` into a sparse vector of size `m`. In julia,
+sparse vectors are really just sparse matrices with one column.
+"""
+sparsevec(a::AbstractVector) = convert(SparseVector{T, Int}, a)
+sparse(a::AbstractVector) = sparsevec(a)
+
+function _dense2sparsevec{Tv,Ti}(s::AbstractVector{Tv}, initcap::Ti)
+    # pre-condition: initcap > 0; the initcap determines the index type
     n = length(s)
     cap = initcap
-    nzind = Array(Int, cap)
+    nzind = Array(Ti, cap)
     nzval = Array(Tv, cap)
     c = 0
     @inbounds for i = 1:n
@@ -274,13 +298,13 @@ function _dense2sparsevec{Tv}(s::Vector{Tv}, initcap::Int)
     SparseVector(n, nzind, nzval)
 end
 
-convert{Tv}(::Type{SparseVector{Tv,Int}}, s::Vector{Tv}) =
-    _dense2sparsevec(s, max(8, div(length(s), 8)))
+convert{Tv,Ti}(::Type{SparseVector{Tv,Ti}}, s::AbstractVector{Tv}) =
+    _dense2sparsevec(s, convert(Ti, max(8, div(length(s), 8))))
 
-convert{Tv}(::Type{SparseVector{Tv}}, s::Vector{Tv}) =
+convert{Tv}(::Type{SparseVector{Tv}}, s::AbstractVector{Tv}) =
     convert(SparseVector{Tv,Int}, s)
 
-convert{Tv}(::Type{SparseVector}, s::Vector{Tv}) =
+convert{Tv}(::Type{SparseVector}, s::AbstractVector{Tv}) =
     convert(SparseVector{Tv,Int}, s)
 
 
@@ -294,21 +318,21 @@ convert{Tv,TvS,TiS}(::Type{SparseVector{Tv}}, s::SparseVector{TvS,TiS}) =
 
 ### Rand Construction
 
-function sprand{T}(n::Integer, p::FloatingPoint, rfn::Function, ::Type{T})
+function sprand{T}(n::Integer, p::AbstractFloat, rfn::Function, ::Type{T})
     I = randsubseq(1:convert(Int, n), p)
     V = rfn(T, length(I))
     SparseVector(n, I, V)
 end
 
-function sprand(n::Integer, p::FloatingPoint, rfn::Function)
+function sprand(n::Integer, p::AbstractFloat, rfn::Function)
     I = randsubseq(1:convert(Int, n), p)
     V = rfn(length(I))
     SparseVector(n, I, V)
 end
 
-sprand{T}(n::Integer, p::FloatingPoint, ::Type{T}) = sprand(n, p, rand, T)
-sprand(n::Integer, p::FloatingPoint) = sprand(n, p, rand)
-sprandn(n::Integer, p::FloatingPoint) = sprand(n, p, randn)
+sprand{T}(n::Integer, p::AbstractFloat, ::Type{T}) = sprand(n, p, rand, T)
+sprand(n::Integer, p::AbstractFloat) = sprand(n, p, rand)
+sprandn(n::Integer, p::AbstractFloat) = sprand(n, p, randn)
 
 ## Indexing
 
@@ -442,17 +466,6 @@ end
 show(io::IO, x::AbstractSparseVector) = showarray(io, x)
 writemime(io::IO, ::MIME"text/plain", x::AbstractSparseVector) = show(io, x)
 
-
-### Comparison
-
-function exact_equal(x::AbstractSparseVector, y::AbstractSparseVector)
-    eltype(x) == eltype(y) &&
-    eltype(nonzeroinds(x)) == eltype(nonzeroinds(y)) &&
-    length(x) == length(y) &&
-    nonzeroinds(x) == nonzeroinds(y) &&
-    nonzeros(x) == nonzeros(y)
-end
-
 ### Conversion to matrix
 
 function convert{TvD,TiD,Tv,Ti}(::Type{SparseMatrixCSC{TvD,TiD}}, x::AbstractSparseVector{Tv,Ti})
@@ -496,7 +509,7 @@ function reinterpret{T,Tv}(::Type{T}, x::AbstractSparseVector{Tv})
     SparseVector(length(x), copy(nonzeroinds(x)), reinterpret(T, nonzeros(x)))
 end
 
-float{Tv<:FloatingPoint}(x::AbstractSparseVector{Tv}) = x
+float{Tv<:AbstractFloat}(x::AbstractSparseVector{Tv}) = x
 float(x::AbstractSparseVector) =
     SparseVector(length(x), copy(nonzeroinds(x)), float(nonzeros(x)))
 
@@ -1038,7 +1051,7 @@ function dot{Tx<:Number,Ty<:Number}(x::StridedVector{Tx}, y::AbstractSparseVecto
     nzval = nonzeros(y)
     s = zero(Tx) * zero(Ty)
     for i = 1:length(nzind)
-        s += _dot(x[nzind[i]], nzval[i])
+        s += conj(x[nzind[i]]) * nzval[i]
     end
     return s
 end
@@ -1050,7 +1063,7 @@ function dot{Tx<:Number,Ty<:Number}(x::AbstractSparseVector{Tx}, y::AbstractVect
     nzval = nonzeros(x)
     s = zero(Tx) * zero(Ty)
     for i = 1:length(nzind)
-        s += _dot(nzval[i], y[nzind[i]])
+        s += conj(nzval[i]) * y[nzind[i]]
     end
     return s
 end

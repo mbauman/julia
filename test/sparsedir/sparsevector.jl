@@ -7,7 +7,7 @@ spv_x1 = SparseVector(8, [2, 5, 6], [1.25, -0.75, 3.5])
 @test isa(spv_x1, SparseVector{Float64,Int})
 
 x1_full = zeros(length(spv_x1))
-x1_full[nonzeroinds(spv_x1)] = nonzeros(spv_x1)
+x1_full[SparseMatrix.nonzeroinds(spv_x1)] = nonzeros(spv_x1)
 
 ### Basic Properties
 
@@ -22,7 +22,7 @@ let x = spv_x1
 
     @test countnz(x) == 3
     @test nnz(x) == 3
-    @test nonzeroinds(x) == [2, 5, 6]
+    @test SparseMatrix.nonzeroinds(x) == [2, 5, 6]
     @test nonzeros(x) == [1.25, -0.75, 3.5]
 end
 
@@ -43,52 +43,61 @@ end
 
 ### Other Constructors
 
+### Comparison helper to ensure exact equality with internal structure
+function exact_equal(x::AbstractSparseVector, y::AbstractSparseVector)
+    eltype(x) == eltype(y) &&
+    eltype(SparseMatrix.nonzeroinds(x)) == eltype(SparseMatrix.nonzeroinds(y)) &&
+    length(x) == length(y) &&
+    SparseMatrix.nonzeroinds(x) == SparseMatrix.nonzeroinds(y) &&
+    nonzeros(x) == nonzeros(y)
+end
+
 # construct empty sparse vector
 
-@test exact_equal(sparsevector(Float64, 8), SparseVector(8, Int[], Float64[]))
+@test exact_equal(spzeros(Float64, 8), SparseVector(8, Int[], Float64[]))
 
 # from list of indices and values
 
 @test exact_equal(
-    sparsevector(Int[], Float64[], 8),
+    sparsevec(Int[], Float64[], 8),
     SparseVector(8, Int[], Float64[]))
 
 @test exact_equal(
-    sparsevector(Int[], Float64[]),
+    sparsevec(Int[], Float64[]),
     SparseVector(0, Int[], Float64[]))
 
 @test exact_equal(
-    sparsevector([3, 3], [5.0, -5.0], 8),
-    sparsevector(Float64, 8))
+    sparsevec([3, 3], [5.0, -5.0], 8),
+    spzeros(Float64, 8))
 
 @test exact_equal(
-    sparsevector([2, 3, 6], [12.0, 18.0, 25.0]),
+    sparsevec([2, 3, 6], [12.0, 18.0, 25.0]),
     SparseVector(6, [2, 3, 6], [12.0, 18.0, 25.0]))
 
 let x0 = SparseVector(8, [2, 3, 6], [12.0, 18.0, 25.0])
     @test exact_equal(
-        sparsevector([2, 3, 6], [12.0, 18.0, 25.0], 8), x0)
+        sparsevec([2, 3, 6], [12.0, 18.0, 25.0], 8), x0)
 
     @test exact_equal(
-        sparsevector([3, 6, 2], [18.0, 25.0, 12.0], 8), x0)
+        sparsevec([3, 6, 2], [18.0, 25.0, 12.0], 8), x0)
 
     @test exact_equal(
-        sparsevector([2, 3, 4, 4, 6], [12.0, 18.0, 5.0, -5.0, 25.0], 8),
+        sparsevec([2, 3, 4, 4, 6], [12.0, 18.0, 5.0, -5.0, 25.0], 8),
         x0)
 
     @test exact_equal(
-        sparsevector([1, 1, 1, 2, 3, 3, 6], [2.0, 3.0, -5.0, 12.0, 10.0, 8.0, 25.0], 8),
+        sparsevec([1, 1, 1, 2, 3, 3, 6], [2.0, 3.0, -5.0, 12.0, 10.0, 8.0, 25.0], 8),
         x0)
 
     @test exact_equal(
-        sparsevector([2, 3, 6, 7, 7], [12.0, 18.0, 25.0, 5.0, -5.0], 8), x0)
+        sparsevec([2, 3, 6, 7, 7], [12.0, 18.0, 25.0, 5.0, -5.0], 8), x0)
 end
 
 # from dictionary
 
 function my_intmap(x)
     a = Dict{Int,eltype(x)}()
-    for i in nonzeroinds(x)
+    for i in SparseMatrix.nonzeroinds(x)
         a[i] = x[i]
     end
     return a
@@ -96,10 +105,10 @@ end
 
 let x = spv_x1
     a = my_intmap(x)
-    xc = sparsevector(a, 8)
+    xc = sparsevec(a, 8)
     @test exact_equal(x, xc)
 
-    xc = sparsevector(a)
+    xc = sparsevec(a)
     @test exact_equal(xc, SparseVector(6, [2, 5, 6], [1.25, -0.75, 3.5]))
 end
 
@@ -147,7 +156,7 @@ end
 
 # setindex
 
-let xc = sparsevector(Float64, 8)
+let xc = spzeros(Float64, 8)
     xc[3] = 2.0
     @test exact_equal(xc, SparseVector(8, [3], [2.0]))
 end
@@ -275,25 +284,25 @@ let S = sprand(4, 8, 0.5)
     @assert isa(Sf, Matrix{Float64})
 
     # get a single column
-    for j = 1:size(S,2)
-        col = getcol(S, j)
-        @test isa(col, SparseVector{Float64,Int})
-        @test length(col) == size(S,1)
-        @test full(col) == Sf[:,j]
-    end
-
-    # non-empty range
-    V = unsafe_colrange(S, 2:6)
-    @test isa(V, SparseMatrixCSC{Float64,Int})
-    @test size(V) == (4, 5)
-    @test full(V) == Sf[:, 2:6]
-    @test !isempty(V)
-
-    # empty range
-    V0 = unsafe_colrange(S, 2:1)
-    @test isa(V0, SparseMatrixCSC{Float64,Int})
-    @test size(V0) == (4, 0)
-    @test isempty(V0)
+    # for j = 1:size(S,2)
+    #     col = getcol(S, j)
+    #     @test isa(col, SparseVector{Float64,Int})
+    #     @test length(col) == size(S,1)
+    #     @test full(col) == Sf[:,j]
+    # end
+    #
+    # # non-empty range
+    # V = unsafe_colrange(S, 2:6)
+    # @test isa(V, SparseMatrixCSC{Float64,Int})
+    # @test size(V) == (4, 5)
+    # @test full(V) == Sf[:, 2:6]
+    # @test !isempty(V)
+    #
+    # # empty range
+    # V0 = unsafe_colrange(S, 2:1)
+    # @test isa(V0, SparseMatrixCSC{Float64,Int})
+    # @test size(V0) == (4, 0)
+    # @test isempty(V0)
 
 end
 
@@ -309,10 +318,11 @@ rnd_x1 = sprand(50, 0.7) * 4.0
 rnd_x1f = full(rnd_x1)
 
 spv_x1 = SparseVector(8, [2, 5, 6], [1.25, -0.75, 3.5])
+spv_x2 = SparseVector(8, [1, 2, 6, 7], [3.25, 4.0, -5.5, -6.0])
 
 ### Arithmetic operations
 
-let x = spv_x1
+let x = spv_x1, x2 = x2 = spv_x2
     # negate
     @test exact_equal(-x, SparseVector(8, [2, 5, 6], [-1.25, 0.75, -3.5]))
 
@@ -357,7 +367,7 @@ end
 
 ### Complex
 
-let x = spv_x1
+let x = spv_x1, x2 = spv_x2
     # complex
     @test exact_equal(complex(x, x),
         SparseVector(8, [2,5,6], [1.25+1.25im, -0.75-0.75im, 3.5+3.5im]))
@@ -369,7 +379,7 @@ let x = spv_x1
     # real & imag
 
     @test is(real(x), x)
-    @test exact_equal(imag(x), sparsevector(Float64, length(x)))
+    @test exact_equal(imag(x), spzeros(Float64, length(x)))
 
     xcp = complex(x, x2)
     @test exact_equal(real(xcp), x)
@@ -458,7 +468,7 @@ let x = SparseVector(3, [1, 2, 3], [-4.5, 2.5, 3.5])
     @test minabs(x) == 2.5
 end
 
-let x = sparsevector(Float64, 8)
+let x = spzeros(Float64, 8)
     @test maximum(x) == 0.0
     @test minimum(x) == 0.0
     @test maxabs(x) == 0.0
@@ -477,7 +487,7 @@ let x = sprand(16, 0.5), x2 = sprand(16, 0.4)
     # axpy!
     for c in [1.0, -1.0, 2.0, -2.0]
         y = full(x)
-        @test is(axpy!(c, x2, y), y)
+        @test is(Base.axpy!(c, x2, y), y)
         @test y == full(x2 * c + x)
     end
 
@@ -557,7 +567,7 @@ let A = sprandn(9, 16, 0.5), x = sprand(16, 0.7)
         @test is(A_mul_B!(α, A, x, β, y), y)
         @test_approx_eq y rr
     end
-    y = densemv(A, x)
+    y = SparseMatrix.densemv(A, x)
     @test isa(y, Vector{Float64})
     @test_approx_eq y Af * xf
 end
@@ -571,7 +581,7 @@ let A = sprandn(16, 9, 0.5), x = sprand(16, 0.7)
         @test is(At_mul_B!(α, A, x, β, y), y)
         @test_approx_eq y rr
     end
-    y = densemv(A, x; trans='T')
+    y = SparseMatrix.densemv(A, x; trans='T')
     @test isa(y, Vector{Float64})
     @test_approx_eq y At_mul_B(Af, xf)
 end
@@ -582,9 +592,9 @@ let A = complex(sprandn(7, 8, 0.5), sprandn(7, 8, 0.5)),
     Af = full(A)
     xf = full(x)
     x2f = full(x2)
-    @test_approx_eq densemv(A, x; trans='N') Af * xf
-    @test_approx_eq densemv(A, x2; trans='T') Af.' * x2f
-    @test_approx_eq densemv(A, x2; trans='C') Af'x2f
+    @test_approx_eq SparseMatrix.densemv(A, x; trans='N') Af * xf
+    @test_approx_eq SparseMatrix.densemv(A, x2; trans='T') Af.' * x2f
+    @test_approx_eq SparseMatrix.densemv(A, x2; trans='C') Af'x2f
 end
 
 ## sparse A * sparse x -> sparse y
