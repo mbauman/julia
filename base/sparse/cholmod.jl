@@ -1216,6 +1216,17 @@ function cholfact(A::Sparse; kws...)
     return F
 end
 
+doc"""
+    ldltfact(::Union{SparseMatrixCSC,Symmetric{Float64,SparseMatrixCSC{Flaot64,SuiteSparse_long}},Hermitian{Complex{Float64},SparseMatrixCSC{Complex{Float64},SuiteSparse_long}}}; shift=0, perm=Int[]) -> CHOLMOD.Factor
+
+Compute the `LDLt` factorization of a sparse symmetric or Hermitian matrix. A fill-reducing permutation is used. `F = ldltfact(A)` is most frequently used to solve systems of equations `A*x = b` with `F\b`, but also the methods `diag`, `det`, `logdet` are defined for `F`. You can also extract individual factors from `F`, using `F[:L]`. However, since pivoting is on by default, the factorization is internally represented as `A == P'*L*D*L'*P` with a permutation matrix `P`; using just `L` without accounting for `P` will give incorrect answers. To include the effects of permutation, it's typically preferable to extact "combined" factors like `PtL = F[:PtL]` (the equivalent of `P'*L`) and `LtP = F[:UP]` (the equivalent of `L'*P`). The complete list of supported factors is `:L, :PtL, :D, :UP, :U, :LD, :DU, :PtLD, :DUP`.
+
+Setting optional `shift` keyword argument computes the factorization of `A+shift*I` instead of `A`. If the `perm` argument is nonempty, it should be a permutation of `1:size(A,1)` giving the ordering to use (instead of CHOLMOD's default AMD ordering).
+
+The function calls the C library CHOLMOD and many other functions from the library are wrapped but not exported.
+"""
+ldltfact(A::SparseMatrixCSC; shift=0, perm=Int[])
+
 function ldltfact(A::Sparse; kws...)
     cm = defaults(common()) # setting the common struct to default values. Should only be done when creating new factorization.
     set_print_level(cm, 0) # no printing from CHOLMOD by default
