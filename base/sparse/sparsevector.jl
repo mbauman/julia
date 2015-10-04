@@ -345,7 +345,7 @@ function getindex(x::SparseMatrixCSC, ::Colon, j::Integer)
     SparseVector(x.m, x.rowval[r1:r2], x.nzval[r1:r2])
 end
 
-function Base.getindex(x::SparseMatrixCSC, I::UnitRange, j::Integer)
+function getindex(x::SparseMatrixCSC, I::UnitRange, j::Integer)
     checkbounds(x, I, j)
     # Get the selected column
     c1 = convert(Int, x.colptr[j])
@@ -356,61 +356,12 @@ function Base.getindex(x::SparseMatrixCSC, I::UnitRange, j::Integer)
     SparseVector(length(I), x.rowval[r1:r2] - first(I) + 1, x.nzval[r1:r2])
 end
 
-function getindex{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, I::AbstractArray, j::Integer)
-    # Cribbed from the SparseMatrix getindex_I_sorted_bsearch_A
-    checkbounds(A, I, j)
-    const nI = length(I)
-
-    colptrA = A.colptr; rowvalA = A.rowval; nzvalA = A.nzval
-
-    ptrS = 1
-    # determine result size
-    let
-        col = j
-        ptrI::Int = 1 # runs through I
-        ptrA::Int = colptrA[col]
-        stopA::Int = colptrA[col+1]-1
-        if ptrA <= stopA
-            while ptrI <= nI
-                rowI = I[ptrI]
-                ptrI += 1
-                (rowvalA[ptrA] > rowI) && continue
-                ptrA = searchsortedfirst(rowvalA, rowI, ptrA, stopA, Base.Order.Forward)
-                (ptrA <= stopA) || break
-                if rowvalA[ptrA] == rowI
-                    ptrS += 1
-                end
-            end
-        end
-    end
-    rowvalS = Array(Ti, ptrS-1)
-    nzvalS  = Array(Tv, ptrS-1)
-
-    # fill the values
-    let
-        ptrS = 1
-        col = j
-        ptrI::Int = 1 # runs through I
-        ptrA::Int = colptrA[col]
-        stopA::Int = colptrA[col+1]-1
-        if ptrA <= stopA
-            while ptrI <= nI
-                rowI = I[ptrI]
-                if rowvalA[ptrA] <= rowI
-                    ptrA = searchsortedfirst(rowvalA, rowI, ptrA, stopA, Base.Order.Forward)
-                    (ptrA <= stopA) || break
-                    if rowvalA[ptrA] == rowI
-                        rowvalS[ptrS] = ptrI
-                        nzvalS[ptrS] = nzvalA[ptrA]
-                        ptrS += 1
-                    end
-                end
-                ptrI += 1
-            end
-        end
-    end
-    return SparseVector(nI, rowvalS, nzvalS)
+# In the general case, we piggy back upon SparseMatrixCSC's optimized solution
+function getindex{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, I::AbstractVector, J::Integer)
+    M = A[I, [J]]
+    SparseVector(M.m, M.rowval, M.nzval)
 end
+
 
 # Logical and linear indexing into SparseMatrices
 getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractVector{Bool}) = _logical_index(A, I) # Ambiguities

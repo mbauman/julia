@@ -1681,8 +1681,8 @@ end
 
 function getindex_general{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, I::AbstractVector, J::AbstractVector)
     pI = sortperm(I)
-    @inbounds I = I[pI]
-    permute_rows!(getindex_I_sorted(A, I, J), pI)
+    @inbounds Is = I[pI]
+    permute_rows!(getindex_I_sorted(A, Is, J), pI)
 end
 
 # the general case:
