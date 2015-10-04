@@ -121,12 +121,9 @@ end
 """
     sparsevec(I, V, [m, combine])
 
-Create a sparse matrix `S` of size `m x 1` such that `S[I[k]] = V[k]`.
+Create a sparse vector `S` of length `m` such that `S[I[k]] = V[k]`.
 Duplicates are combined using the `combine` function, which defaults to
-`+` if it is not provided. In julia, sparse vectors are really just sparse
-matrices with one column. Given Julia's Compressed Sparse Columns (CSC)
-storage format, a sparse column matrix with one column is sparse, whereas
-a sparse row matrix with one row ends up being dense.
+`+` if it is not provided.
 """
 function sparsevec{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, combine::BinaryOp)
     length(I) == length(V) ||
@@ -185,7 +182,7 @@ function sparsevec{Tv,Ti<:Integer}(dict::Associative{Ti,Tv})
     cnt = 0
     len = zero(Ti)
     for (k, v) in dict
-        k >= 1 || error("Index must be positive.")
+        k >= 1 || throw(ArgumentError("index must be positive."))
         if k > len
             len = k
         end
@@ -208,7 +205,7 @@ function sparsevec{Tv,Ti<:Integer}(dict::Associative{Ti,Tv}, len::Integer)
     cnt = 0
     maxk = convert(Ti, len)
     for (k, v) in dict
-        1 <= k <= maxk || error("An index (key) is out of bound.")
+        1 <= k <= maxk || throw(ArgumentError("an index (key) is out of bound."))
         if v != zero(v)
             cnt += 1
             @inbounds nzind[cnt] = k
@@ -224,6 +221,7 @@ end
 ### Element access
 
 function setindex!{Tv,Ti<:Integer}(x::SparseVector{Tv,Ti}, v::Tv, i::Ti)
+    checkbounds(x, i)
     nzind = nonzeroinds(x)
     nzval = nonzeros(x)
 
@@ -272,9 +270,10 @@ Convert a vector `A` into a sparse vector of size `m`. In julia,
 sparse vectors are really just sparse matrices with one column.
 """
 sparsevec{T}(a::AbstractVector{T}) = convert(SparseVector{T, Int}, a)
+sparsevec(a::AbstractArray) = sparsevec(vec(a))
 sparse(a::AbstractVector) = sparsevec(a)
 
-function _dense2sparsevec{Tv,Ti}(s::AbstractVector{Tv}, initcap::Ti)
+function _dense2sparsevec{Tv,Ti}(s::AbstractArray{Tv}, initcap::Ti)
     # pre-condition: initcap > 0; the initcap determines the index type
     n = length(s)
     cap = initcap
@@ -579,6 +578,7 @@ convert{Tv,Ti}(::Type{SparseMatrixCSC}, x::AbstractSparseVector{Tv,Ti}) =
 
 function full{Tv}(x::AbstractSparseVector{Tv})
     n = length(x)
+    n == 0 && return Array(Tv, 0)
     nzind = nonzeroinds(x)
     nzval = nonzeros(x)
     r = zeros(Tv, n)

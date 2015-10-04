@@ -553,7 +553,8 @@ let X = eye(5), M = rand(5,4), C = spzeros(3,3)
     VM = vec(M); VSM1 = vec(SM); VSM2 = sparsevec(M)
     VC = vec(C)
     @test reshape(VX, (25,1)) == VSX
-    @test reshape(VM, (20,1)) == VSM1 == VSM2
+    @test reshape(VM, (20,1)) == VSM1
+    @test VM == VSM2
     @test size(VC) == (9,1)
     @test nnz(VC) == 0
     @test nnz(VSX) == 5
@@ -761,7 +762,7 @@ end
 
 # issue #9917
 @test sparse([]') == reshape(sparse([]), 1, 0)
-@test full(sparse([])) == zeros(0, 1)
+@test full(sparse([])) == zeros(0)
 @test_throws BoundsError sparse([])[1]
 @test_throws BoundsError sparse([])[1] = 1
 x = speye(100)
