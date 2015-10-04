@@ -98,7 +98,7 @@ function _sparsevector!{Tv,Ti<:Integer}(I::Vector{Ti}, V::Vector{Tv}, len::Integ
                 V[l] = call(combine, V[l], V[r])
             else  # advance l, and move r-th to l-th
                 pv = V[l]
-                if pv != zero(Tv)
+                if pv != 0
                     l += 1
                 end
                 i = i2
@@ -186,7 +186,7 @@ function sparsevec{Tv,Ti<:Integer}(dict::Associative{Ti,Tv})
         if k > len
             len = k
         end
-        if v != zero(v)
+        if v != 0
             cnt += 1
             @inbounds nzind[cnt] = k
             @inbounds nzval[cnt] = v
@@ -206,7 +206,7 @@ function sparsevec{Tv,Ti<:Integer}(dict::Associative{Ti,Tv}, len::Integer)
     maxk = convert(Ti, len)
     for (k, v) in dict
         1 <= k <= maxk || throw(ArgumentError("an index (key) is out of bound."))
-        if v != zero(v)
+        if v != 0
             cnt += 1
             @inbounds nzind[cnt] = k
             @inbounds nzval[cnt] = v
@@ -228,14 +228,14 @@ function setindex!{Tv,Ti<:Integer}(x::SparseVector{Tv,Ti}, v::Tv, i::Ti)
     m = length(nzind)
     k = searchsortedfirst(nzind, i)
     if 1 <= k <= m && nzind[k] == i  # i found
-        if v == zero(v)
+        if v == 0
             deleteat!(nzind, k)
             deleteat!(nzval, k)
         else
             nzval[k] = v
         end
     else  # i not found
-        if v != zero(v)
+        if v != 0
             insert!(nzind, k, i)
             insert!(nzval, k, v)
         end
@@ -282,7 +282,7 @@ function _dense2sparsevec{Tv,Ti}(s::AbstractArray{Tv}, initcap::Ti)
     c = 0
     @inbounds for i = 1:n
         v = s[i]
-        if v != zero(v)
+        if v != 0
             if c >= cap
                 cap *= 2
                 resize!(nzind, cap)
@@ -504,7 +504,7 @@ function getindex{Tv,Ti}(x::AbstractSparseVector{Tv,Ti}, I::AbstractVector)
     c = 0
     for j = 1:n
         v = _spgetindex(m, xnzind, xnzval, I[j])
-        if v != zero(v)
+        if v != 0
             c += 1
             nzind[c] = convert(Ti, j)
             nzval[c] = v
@@ -1238,7 +1238,7 @@ function A_mul_B!(α::Number, A::StridedMatrix, x::AbstractSparseVector, β::Num
     xnzval = nonzeros(x)
     @inbounds for i = 1:length(xnzind)
         v = xnzval[i]
-        if v != zero(v)
+        if v != 0
             j = xnzind[i]
             αv = v * α
             for r = 1:m
@@ -1338,7 +1338,7 @@ function A_mul_B!(α::Number, A::SparseMatrixCSC, x::AbstractSparseVector, β::N
 
     @inbounds for i = 1:length(xnzind)
         v = xnzval[i]
-        if v != zero(v)
+        if v != 0
             αv = v * α
             j = xnzind[i]
             for r = A.colptr[j]:(Acolptr[j+1]-1)
@@ -1425,7 +1425,7 @@ function _At_or_Ac_mul_B{TvA,TiA,TvX,TiX}(tfun::BinaryOp, A::SparseMatrixCSC{TvA
     for j = 1:n
         s = _spdot(tfun, Acolptr[j], Acolptr[j+1]-1, Arowval, Anzval,
                    1, mx, xnzind, xnzval)
-        if s != zero(s)
+        if s != 0
             jr += 1
             ynzind[jr] = j
             ynzval[jr] = s
