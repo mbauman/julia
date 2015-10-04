@@ -381,18 +381,18 @@ for (aa116, ss116) in [(a116, s116), (ad116, sd116)]
 
     # range indexing
     @test full(ss116[i,:]) == aa116[i,:]
-    @test full(ss116[:,j]) == aa116[:,j]'' # sparse matrices/vectors always have ndims==2:
+    @test full(ss116[:,j]) == aa116[:,j]
     @test full(ss116[i,1:2:end]) == aa116[i,1:2:end]
-    @test full(ss116[1:2:end,j]) == aa116[1:2:end,j]''
+    @test full(ss116[1:2:end,j]) == aa116[1:2:end,j]
     @test full(ss116[i,end:-2:1]) == aa116[i,end:-2:1]
-    @test full(ss116[end:-2:1,j]) == aa116[end:-2:1,j]''
+    @test full(ss116[end:-2:1,j]) == aa116[end:-2:1,j]
     # float-range indexing is not supported
 
     # sorted vector indexing
     @test full(ss116[i,[3:2:end-3;]]) == aa116[i,[3:2:end-3;]]
-    @test full(ss116[[3:2:end-3;],j]) == aa116[[3:2:end-3;],j]''
+    @test full(ss116[[3:2:end-3;],j]) == aa116[[3:2:end-3;],j]
     @test full(ss116[i,[end-3:-2:1;]]) == aa116[i,[end-3:-2:1;]]
-    @test full(ss116[[end-3:-2:1;],j]) == aa116[[end-3:-2:1;],j]''
+    @test full(ss116[[end-3:-2:1;],j]) == aa116[[end-3:-2:1;],j]
 
     # unsorted vector indexing with repetition
     p = [4, 1, 2, 3, 2, 6]
@@ -403,7 +403,7 @@ for (aa116, ss116) in [(a116, s116), (ad116, sd116)]
     # bool indexing
     li = bitrand(size(aa116,1))
     lj = bitrand(size(aa116,2))
-    @test full(ss116[li,j]) == aa116[li,j]''
+    @test full(ss116[li,j]) == aa116[li,j]
     @test full(ss116[li,:]) == aa116[li,:]
     @test full(ss116[i,lj]) == aa116[i,lj]
     @test full(ss116[:,lj]) == aa116[:,lj]
@@ -412,7 +412,7 @@ for (aa116, ss116) in [(a116, s116), (ad116, sd116)]
     # empty indices
     for empty in (1:0, Int[])
         @test full(ss116[empty,:]) == aa116[empty,:]
-        @test full(ss116[:,empty]) == aa116[:,empty]''
+        @test full(ss116[:,empty]) == aa116[:,empty]
         @test full(ss116[empty,lj]) == aa116[empty,lj]
         @test full(ss116[li,empty]) == aa116[li,empty]
         @test full(ss116[empty,empty]) == aa116[empty,empty]
@@ -445,7 +445,7 @@ S1290 = SparseMatrixCSC(3, 3, UInt8[1,1,1,1], UInt8[], Int64[])
     S1290[end] = 3
     @test S1290[end] == (S1290[1] + S1290[2,2])
     @test 6 == sum(diag(S1290))
-    @test (full(S1290)[[3,1],1])'' == full(S1290[[3,1],1])
+    @test full(S1290)[[3,1],1] == full(S1290[[3,1],1])
 # end
 
 
@@ -457,7 +457,7 @@ let a = spzeros(Int, 10, 10)
     @test a[1,:] == sparse(ones(Int,1,10))
     a[:,2] = 2
     @test countnz(a) == 19
-    @test a[:,2] == 2*sparse(ones(Int,10,1))
+    @test a[:,2] == 2*sparse(ones(Int,10))
 
     a[1,:] = 1:10
     @test a[1,:] == sparse([1:10;]')
@@ -500,9 +500,9 @@ let ASZ = 1000, TSZ = 800
 end
 
 let A = speye(Int, 5), I=1:10, X=reshape([trues(10); falses(15)],5,5)
-    @test A[I] == A[X] == reshape([1,0,0,0,0,0,1,0,0,0], 10, 1)
+    @test A[I] == A[X] == [1,0,0,0,0,0,1,0,0,0]
     A[I] = [1:10;]
-    @test A[I] == A[X] == reshape(1:10, 10, 1)
+    @test A[I] == A[X] == collect(1:10)
 end
 
 let S = sprand(50, 30, 0.5, x->round(Int,rand(x)*100)), I = sprandbool(50, 30, 0.2)
@@ -540,7 +540,7 @@ let S = sprand(50, 30, 0.5, x->round(Int,rand(x)*100))
 end
 
 #Issue 7507
-@test (i7507=sparsevec(Dict{Int64, Float64}(), 10))==spzeros(10,1)
+@test (i7507=sparsevec(Dict{Int64, Float64}(), 10))==spzeros(10)
 
 #Issue 7650
 let S = spzeros(3, 3)

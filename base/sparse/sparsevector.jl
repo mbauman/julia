@@ -50,6 +50,7 @@ similar{T}(x::SparseVector, ::Type{T}, D::Dims) = spzeros(T, D...)
 
 ### Construct empty sparse vector
 
+spzeros(len::Integer) = spzeros(Float64, len)
 spzeros{T}(::Type{T}, len::Integer) = SparseVector(len, Int[], T[])
 
 ### Construction from lists of indices and values
