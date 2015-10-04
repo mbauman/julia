@@ -9,14 +9,14 @@ import Base.LinAlg: (\), A_mul_Bc, A_mul_Bt, Ac_ldiv_B, Ac_mul_B, At_ldiv_B, At_
                  cholfact, det, diag, ishermitian, isposdef,
                  issym, ldltfact, logdet
 
-importall ..SparseMatrix
+importall ..SparseArrays
 
 export
     Dense,
     Factor,
     Sparse
 
-import ..SparseMatrix: AbstractSparseMatrix, SparseMatrixCSC, increment, indtype
+import ..SparseArrays: AbstractSparseMatrix, SparseMatrixCSC, increment, indtype
 
 #########
 # Setup #
@@ -997,7 +997,7 @@ function sparse(F::Factor)
         L, d = getLd!(LD)
         A = scale(L, d)*L'
     end
-    SparseMatrix.sortSparseMatrixCSC!(A)
+    SparseArrays.sortSparseMatrixCSC!(A)
     p = get_perm(F)
     if p != [1:s.n;]
         pinv = Array(Int, length(p))

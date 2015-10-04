@@ -842,3 +842,5 @@ for f in (:remotecall, :remotecall_fetch, :remotecall_wait)
         @deprecate ($f)(id::Integer, f::Function, args...)        ($f)(f, id::Integer, args...)
     end
 end
+
+@deprecate_binding SparseMatrix SparseArrays

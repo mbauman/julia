@@ -284,12 +284,12 @@ importall .Profile
 include("Dates.jl")
 import .Dates: Date, DateTime, now
 
-# sparse matrices and sparse linear algebra
+# sparse matrices, vectors, and sparse linear algebra
 include("sparse.jl")
-importall .SparseMatrix
-# SparseMatrix module re-exports
+importall .SparseArrays
+# SparseArrays module re-exports
 export
-    SparseMatrix,
+    SparseArrays,
     AbstractSparseArray,
     AbstractSparseMatrix,
     AbstractSparseVector,

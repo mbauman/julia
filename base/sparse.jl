@@ -1,6 +1,6 @@
 # This file is a part of Julia. License is MIT: http://julialang.org/license
 
-module SparseMatrix
+module SparseArrays
 
 using Base: Func, AddFun, OrFun, ConjFun, IdFun
 using Base.Sort: Forward
@@ -31,4 +31,4 @@ if Base.USE_GPL_LIBS
     include("sparse/spqr.jl")
 end
 
-end # module SparseMatrix
+end
