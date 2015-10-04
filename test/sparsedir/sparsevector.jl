@@ -646,4 +646,4 @@ end
 sv = sparse(1:10)
 sm = convert(SparseMatrixCSC, sv)
 sv[1] = 0
-@test full(sm)[2:end] = collect(2:10)
+@test full(sm)[2:end] == collect(2:10)
