@@ -532,27 +532,29 @@ function showarray(io::IO, x::AbstractSparseVector;
     xnnz = length(nzind)
 
     if header
-        print(io, "Sparse vector, length = ", n,
-            ", with ", xnnz, " ", eltype(nzval), " entries:", "\n")
+        println(io, summary(x))
     end
     half_screen_rows = limit ? div(rows - 8, 2) : typemax(Int)
     pad = ndigits(n)
-    k = 0
     sep = "\n\t"
     for k = 1:length(nzind)
         if k < half_screen_rows || k > xnnz - half_screen_rows
             print(io, "  ", '[', rpad(nzind[k], pad), "]  =  ")
             showcompact(io, nzval[k])
+            println(io)
         elseif k == half_screen_rows
-            print(io, sep, '\u22ee')
+            println(io, "   ", " "^pad, "   \u22ee")
         end
-        print(io, "\n")
-        k += 1
     end
 end
 
+function summary(x::AbstractSparseVector)
+    string("Sparse vector of length ", length(x), ", with ", length(nonzeros(x)),
+           " ",  eltype(x), " nonzero entries:")
+end
+
 show(io::IO, x::AbstractSparseVector) = showarray(io, x)
-writemime(io::IO, ::MIME"text/plain", x::AbstractSparseVector) = show(io, x)
+writemime(io::IO, ::MIME"text/plain", x::AbstractSparseVector) = Base.with_output_limit(()->show(io, x))
 
 ### Conversion to matrix
 
