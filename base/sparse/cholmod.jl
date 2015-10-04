@@ -853,6 +853,9 @@ function convert{Tv<:VTypes}(::Type{Sparse}, A::SparseMatrixCSC{Tv,SuiteSparse_l
 
     return o
 end
+
+# convert SparseVectors into CHOLMOD Sparse types through a mx1 CSC matrix
+convert{Tv<:VTypes}(::Type{Sparse}, A::SparseVector{Tv,SuiteSparse_long}) = convert(Sparse, convert(SparseMatrixCSC, A))
 function convert{Tv<:VTypes}(::Type{Sparse}, A::SparseMatrixCSC{Tv,SuiteSparse_long})
     o = Sparse(A, 0)
     # check if array is symmetric and change stype if it is

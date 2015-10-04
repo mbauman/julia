@@ -639,3 +639,11 @@ let A = complex(sprandn(7, 8, 0.5), sprandn(7, 8, 0.5)),
     @test isa(y, SparseVector{Complex128,Int})
     @test_approx_eq full(y) Af'x2f
 end
+
+# It's tempting to share data between a SparseVector and a SparseMatrix,
+# but if that's done, then modifications to one or the other will cause
+# an inconsistent state:
+sv = sparse(1:10)
+sm = convert(SparseMatrixCSC, sv)
+sv[1] = 0
+@test full(sm)[2:end] = collect(2:10)

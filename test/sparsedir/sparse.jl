@@ -552,10 +552,10 @@ let X = eye(5), M = rand(5,4), C = spzeros(3,3)
     VX = vec(X); VSX = vec(SX)
     VM = vec(M); VSM1 = vec(SM); VSM2 = sparsevec(M)
     VC = vec(C)
-    @test reshape(VX, (25,1)) == VSX
-    @test reshape(VM, (20,1)) == VSM1
+    @test VX == VSX
+    @test VM == VSM1
     @test VM == VSM2
-    @test size(VC) == (9,1)
+    @test size(VC) == (9,)
     @test nnz(VC) == 0
     @test nnz(VSX) == 5
 end
@@ -1072,7 +1072,7 @@ Ai = ceil(Int,Ar*100)
 @test_approx_eq vecnorm(Ai)    vecnorm(full(Ai))
 
 # test sparse matrix cond
-A = sparse([1.0])
+A = sparse(reshape([1.0],1,1))
 Ac = sprandn(20,20,.5) + im* sprandn(20,20,.5)
 Ar = sprandn(20,20,.5)
 @test cond(A,1) == 1.0

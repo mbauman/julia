@@ -29,7 +29,7 @@ immutable SparseVector{Tv,Ti<:Integer} <: AbstractSparseVector{Tv,Ti}
     function SparseVector(n::Integer, nzind::Vector{Ti}, nzval::Vector{Tv})
         n >= 0 || throw(ArgumentError("The number of elements must be non-negative."))
         length(nzind) == length(nzval) ||
-            throw(DimensionMismatch("The lengths of nzind and nzval are inconsistent."))
+            throw(ArgumentError("index and value vectors must be the same length"))
         new(convert(Int, n), nzind, nzval)
     end
 end
@@ -127,7 +127,7 @@ Duplicates are combined using the `combine` function, which defaults to
 """
 function sparsevec{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, combine::BinaryOp)
     length(I) == length(V) ||
-        throw(DimensionMismatch("The lengths of I and V are inconsistent."))
+        throw(ArgumentError("index and value vectors must be the same length"))
     len = 0
     for i in I
         i >= 1 || error("Index must be positive.")
@@ -140,7 +140,7 @@ end
 
 function sparsevec{Tv,Ti<:Integer}(I::AbstractVector{Ti}, V::AbstractVector{Tv}, len::Integer, combine::BinaryOp)
     length(I) == length(V) ||
-        throw(DimensionMismatch("The lengths of I and V are inconsistent."))
+        throw(ArgumentError("index and value vectors must be the same length"))
     maxi = convert(Ti, len)
     for i in I
         1 <= i <= maxi || throw(ArgumentError("An index is out of bound."))
@@ -266,11 +266,11 @@ convert{Tv,Ti}(::Type{SparseVector}, s::SparseMatrixCSC{Tv,Ti}) =
 """
     sparsevec(A)
 
-Convert a vector `A` into a sparse vector of size `m`. In julia,
-sparse vectors are really just sparse matrices with one column.
+Convert a vector `A` into a sparse vector of length `m`.
 """
 sparsevec{T}(a::AbstractVector{T}) = convert(SparseVector{T, Int}, a)
 sparsevec(a::AbstractArray) = sparsevec(vec(a))
+sparsevec(a::AbstractSparseArray) = vec(a)
 sparse(a::AbstractVector) = sparsevec(a)
 
 function _dense2sparsevec{Tv,Ti}(s::AbstractArray{Tv}, initcap::Ti)
@@ -562,6 +562,8 @@ function convert{TvD,TiD,Tv,Ti}(::Type{SparseMatrixCSC{TvD,TiD}}, x::AbstractSpa
     xnzval = nonzeros(x)
     m = length(xnzind)
     colptr = TiD[1, m+1]
+    # Note that this *cannot* share data like normal array conversions, since
+    # modifying one would put the other in an inconsistent state
     rowval = collect(TiD, xnzind)
     nzval = collect(TvD, xnzval)
     SparseMatrixCSC(n, 1, colptr, rowval, nzval)

@@ -257,13 +257,8 @@ complex(A::SparseMatrixCSC, B::SparseMatrixCSC) = A + im*B
 
 # Construct a sparse vector
 
-function vec{Tv,Ti}(S::SparseMatrixCSC{Tv,Ti})
-    colptr = Array(Ti,2)
-    rowval = similar(S.rowval)
-    lS = length(S)
-    sparse_compute_reshaped_colptr_and_rowval(colptr, rowval, lS, 1, S.colptr, S.rowval, S.m, S.n)
-    SparseMatrixCSC(lS, 1, colptr, rowval, copy(S.nzval))
-end
+# Note that unlike `vec` for arrays, this does not share data
+vec(S::SparseMatrixCSC) = S[:]
 
 """
     sparse(A)
