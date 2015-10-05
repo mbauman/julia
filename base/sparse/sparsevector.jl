@@ -1010,14 +1010,6 @@ for (vop, fun, mode) in [(:_vadd, :AddFun, 1),
     end
 end
 
-# to workaround the ambiguities with vectorized dates/arithmetic.jl functions
-if VERSION > v"0.4-dev"
-    +{T<:Dates.TimeType,P<:Dates.GeneralPeriod}(x::StridedVector{P}, y::AbstractSparseVector{T}) = _vadd(x, y)
-    -{T<:Dates.TimeType,P<:Dates.GeneralPeriod}(x::StridedVector{P}, y::AbstractSparseVector{T}) = _vsub(x, y)
-    +{T<:Dates.TimeType,P<:Dates.GeneralPeriod}(x::AbstractSparseVector{T}, y::StridedVector{P}) = _vadd(x, y)
-    -{T<:Dates.TimeType,P<:Dates.GeneralPeriod}(x::AbstractSparseVector{T}, y::StridedVector{P}) = _vsub(x, y)
-end
-
 # to workaround the ambiguities with BitVector
 .*(x::BitVector, y::AbstractSparseVector{Bool}) = _vmul(x, y)
 .*(x::AbstractSparseVector{Bool}, y::BitVector) = _vmul(x, y)
