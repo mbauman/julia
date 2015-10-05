@@ -647,3 +647,6 @@ sv = sparse(1:10)
 sm = convert(SparseMatrixCSC, sv)
 sv[1] = 0
 @test full(sm)[2:end] == collect(2:10)
+
+# Ensure that sparsevec with all-zero values returns an array of zeros
+@test sparsevec([1,2,3],[0,0,0]) == [0,0,0]

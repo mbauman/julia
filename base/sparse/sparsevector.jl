@@ -83,7 +83,7 @@ function _sparsevector!{Tv,Ti<:Integer}(I::Vector{Ti}, V::Vector{Tv}, len::Integ
                 break
             end
         end
-        r > m && SparseVector(len, Ti[], Tv[])
+        r > m && return SparseVector(len, Ti[], Tv[])
 
         # move r-th to l-th
         l = 1       # length of processed part
