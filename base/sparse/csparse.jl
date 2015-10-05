@@ -320,9 +320,9 @@ doc"""
     symperm(A, p)
 
 Return the symmetric permutation of `A`, which is `A[p,p]`. `A` should be
-symmetric and sparse, where only the upper triangular part of the matrix is
-stored. This algorithm ignores the lower triangular part of the matrix. Only the
-upper triangular part of the result is returned as well.
+symmetric, sparse, and only contain nonzeros in the upper triangular part of the
+matrix is stored. This algorithm ignores the lower triangular part of the
+matrix. Only the upper triangular part of the result is returned.
 """
 function symperm{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, pinv::Vector{Ti})
     m, n = size(A)

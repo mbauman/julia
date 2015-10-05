@@ -48,11 +48,10 @@ nonzeros(S::SparseMatrixCSC) = S.nzval
 """
     rowvals(A)
 
-Return a vector of the row indices of `A`, and any modifications to the returned
-vector will mutate `A` as well. Given the internal storage format of sparse
-matrices, providing access to how the row indices are stored internally can be
-useful in conjuction with iterating over structural nonzero values. See
-`nonzeros(A)` and `nzrange(A, col)`.
+Return a vector of the row indices of `A`. Any modifications to the returned
+vector will mutate `A` as well. Providing access to how the row indices are
+stored internally can be useful in conjuction with iterating over structural
+nonzero values. See also `nonzeros(A)` and `nzrange(A, col)`.
 """
 rowvals(S::SparseMatrixCSC) = S.rowval
 
@@ -232,7 +231,7 @@ convert{T}(::Type{AbstractMatrix{T}}, A::SparseMatrixCSC) = convert(SparseMatrix
 convert(::Type{Matrix}, S::SparseMatrixCSC) = full(S)
 
 
-doc"""
+"""
     full(S::AbstractSparseArray)
 
 Convert a sparse matrix `S` into a dense matrix.
