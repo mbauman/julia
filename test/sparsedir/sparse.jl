@@ -190,8 +190,8 @@ for i = 1:5
     a = sprand(10, 5, 0.7)
     b = sprand(5, 15, 0.3)
     @test maximum(abs(a*b - full(a)*full(b))) < 100*eps()
-    @test maximum(abs(Base.SparseMatrix.spmatmul(a,b,sortindices=:sortcols) - full(a)*full(b))) < 100*eps()
-    @test maximum(abs(Base.SparseMatrix.spmatmul(a,b,sortindices=:doubletranspose) - full(a)*full(b))) < 100*eps()
+    @test maximum(abs(Base.SparseArrays.spmatmul(a,b,sortindices=:sortcols) - full(a)*full(b))) < 100*eps()
+    @test maximum(abs(Base.SparseArrays.spmatmul(a,b,sortindices=:doubletranspose) - full(a)*full(b))) < 100*eps()
     @test full(kron(a,b)) == kron(full(a), full(b))
     @test full(kron(full(a),b)) == kron(full(a), full(b))
     @test full(kron(a,full(b))) == kron(full(a), full(b))
@@ -642,9 +642,9 @@ function test_getindex_algs{Tv,Ti}(A::SparseMatrixCSC{Tv,Ti}, I::AbstractVector,
         ((minj < 1) || (maxj > n)) && BoundsError()
     end
 
-    (alg == 0) ? Base.SparseMatrix.getindex_I_sorted_bsearch_A(A, I, J) :
-    (alg == 1) ? Base.SparseMatrix.getindex_I_sorted_bsearch_I(A, I, J) :
-    Base.SparseMatrix.getindex_I_sorted_linear(A, I, J)
+    (alg == 0) ? Base.SparseArrays.getindex_I_sorted_bsearch_A(A, I, J) :
+    (alg == 1) ? Base.SparseArrays.getindex_I_sorted_bsearch_I(A, I, J) :
+    Base.SparseArrays.getindex_I_sorted_linear(A, I, J)
 end
 
 let M=2^14, N=2^4
@@ -1093,12 +1093,12 @@ Ac = sprandn(20,20,.5) + im* sprandn(20,20,.5)
 Aci = ceil(Int64,100*sprand(20,20,.5))+ im*ceil(Int64,sprand(20,20,.5))
 Ar = sprandn(20,20,.5)
 Ari = ceil(Int64,100*Ar)
-@test_approx_eq_eps Base.SparseMatrix.normestinv(Ac,3) norm(inv(full(Ac)),1) 1e-4
-@test_approx_eq_eps Base.SparseMatrix.normestinv(Aci,3) norm(inv(full(Aci)),1) 1e-4
-@test_approx_eq_eps Base.SparseMatrix.normestinv(Ar) norm(inv(full(Ar)),1) 1e-4
-@test_throws ArgumentError Base.SparseMatrix.normestinv(Ac,0)
-@test_throws ArgumentError Base.SparseMatrix.normestinv(Ac,21)
-@test_throws DimensionMismatch Base.SparseMatrix.normestinv(sprand(3,5,.9))
+@test_approx_eq_eps Base.SparseArrays.normestinv(Ac,3) norm(inv(full(Ac)),1) 1e-4
+@test_approx_eq_eps Base.SparseArrays.normestinv(Aci,3) norm(inv(full(Aci)),1) 1e-4
+@test_approx_eq_eps Base.SparseArrays.normestinv(Ar) norm(inv(full(Ar)),1) 1e-4
+@test_throws ArgumentError Base.SparseArrays.normestinv(Ac,0)
+@test_throws ArgumentError Base.SparseArrays.normestinv(Ac,21)
+@test_throws DimensionMismatch Base.SparseArrays.normestinv(sprand(3,5,.9))
 
 @test_throws ErrorException transpose(sub(sprandn(10, 10, 0.3), 1:4, 1:4))
 @test_throws ErrorException ctranspose(sub(sprandn(10, 10, 0.3), 1:4, 1:4))
@@ -1107,7 +1107,7 @@ Ari = ceil(Int64,100*Ar)
 A = sprand(10,10,0.2)
 p = randperm(10)
 q = randperm(10)
-@test Base.SparseMatrix.csc_permute(A, invperm(p), q) == full(A)[p, q]
+@test Base.SparseArrays.csc_permute(A, invperm(p), q) == full(A)[p, q]
 
 # issue #13008
 @test_throws ArgumentError sparse(collect(1:100), collect(1:100), fill(5,100), 5, 5)

@@ -7,7 +7,7 @@ spv_x1 = SparseVector(8, [2, 5, 6], [1.25, -0.75, 3.5])
 @test isa(spv_x1, SparseVector{Float64,Int})
 
 x1_full = zeros(length(spv_x1))
-x1_full[SparseMatrix.nonzeroinds(spv_x1)] = nonzeros(spv_x1)
+x1_full[SparseArrays.nonzeroinds(spv_x1)] = nonzeros(spv_x1)
 
 ### Basic Properties
 
@@ -22,7 +22,7 @@ let x = spv_x1
 
     @test countnz(x) == 3
     @test nnz(x) == 3
-    @test SparseMatrix.nonzeroinds(x) == [2, 5, 6]
+    @test SparseArrays.nonzeroinds(x) == [2, 5, 6]
     @test nonzeros(x) == [1.25, -0.75, 3.5]
 end
 
@@ -46,9 +46,9 @@ end
 ### Comparison helper to ensure exact equality with internal structure
 function exact_equal(x::AbstractSparseVector, y::AbstractSparseVector)
     eltype(x) == eltype(y) &&
-    eltype(SparseMatrix.nonzeroinds(x)) == eltype(SparseMatrix.nonzeroinds(y)) &&
+    eltype(SparseArrays.nonzeroinds(x)) == eltype(SparseArrays.nonzeroinds(y)) &&
     length(x) == length(y) &&
-    SparseMatrix.nonzeroinds(x) == SparseMatrix.nonzeroinds(y) &&
+    SparseArrays.nonzeroinds(x) == SparseArrays.nonzeroinds(y) &&
     nonzeros(x) == nonzeros(y)
 end
 
@@ -97,7 +97,7 @@ end
 
 function my_intmap(x)
     a = Dict{Int,eltype(x)}()
-    for i in SparseMatrix.nonzeroinds(x)
+    for i in SparseArrays.nonzeroinds(x)
         a[i] = x[i]
     end
     return a
@@ -572,7 +572,7 @@ let A = sprandn(9, 16, 0.5), x = sprand(16, 0.7)
         @test is(A_mul_B!(α, A, x, β, y), y)
         @test_approx_eq y rr
     end
-    y = SparseMatrix.densemv(A, x)
+    y = SparseArrays.densemv(A, x)
     @test isa(y, Vector{Float64})
     @test_approx_eq y Af * xf
 end
@@ -586,7 +586,7 @@ let A = sprandn(16, 9, 0.5), x = sprand(16, 0.7)
         @test is(At_mul_B!(α, A, x, β, y), y)
         @test_approx_eq y rr
     end
-    y = SparseMatrix.densemv(A, x; trans='T')
+    y = SparseArrays.densemv(A, x; trans='T')
     @test isa(y, Vector{Float64})
     @test_approx_eq y At_mul_B(Af, xf)
 end
@@ -597,9 +597,9 @@ let A = complex(sprandn(7, 8, 0.5), sprandn(7, 8, 0.5)),
     Af = full(A)
     xf = full(x)
     x2f = full(x2)
-    @test_approx_eq SparseMatrix.densemv(A, x; trans='N') Af * xf
-    @test_approx_eq SparseMatrix.densemv(A, x2; trans='T') Af.' * x2f
-    @test_approx_eq SparseMatrix.densemv(A, x2; trans='C') Af'x2f
+    @test_approx_eq SparseArrays.densemv(A, x; trans='N') Af * xf
+    @test_approx_eq SparseArrays.densemv(A, x2; trans='T') Af.' * x2f
+    @test_approx_eq SparseArrays.densemv(A, x2; trans='C') Af'x2f
 end
 
 ## sparse A * sparse x -> sparse y
@@ -640,7 +640,7 @@ let A = complex(sprandn(7, 8, 0.5), sprandn(7, 8, 0.5)),
     @test_approx_eq full(y) Af'x2f
 end
 
-# It's tempting to share data between a SparseVector and a SparseMatrix,
+# It's tempting to share data between a SparseVector and a SparseArrays,
 # but if that's done, then modifications to one or the other will cause
 # an inconsistent state:
 sv = sparse(1:10)
