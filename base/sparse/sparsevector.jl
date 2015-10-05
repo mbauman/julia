@@ -1,4 +1,6 @@
-### common.jl
+# This file is a part of Julia. License is MIT: http://julialang.org/license
+
+### Common definitions
 
 import Base: Func, AddFun, MulFun, MaxFun, MinFun, SubFun
 
@@ -17,7 +19,7 @@ call(::DotFun, x::Number, y::Number) = conj(x) * y
 typealias UnaryOp Union{Function, Func{1}}
 typealias BinaryOp Union{Function, Func{2}}
 
-### sparsevec.jl
+### The SparseVector
 
 ### Types
 
@@ -95,7 +97,7 @@ function _sparsevector!{Tv,Ti<:Integer}(I::Vector{Ti}, V::Vector{Tv}, len::Integ
             r += 1
             i2 = I[r]
             if i2 == i  # accumulate r-th to the l-th entry
-                V[l] = call(combine, V[l], V[r])
+                V[l] = combine(V[l], V[r])
             else  # advance l, and move r-th to l-th
                 pv = V[l]
                 if pv != 0
@@ -439,8 +441,7 @@ function getindex{Tv}(A::SparseMatrixCSC{Tv}, I::AbstractVector)
 end
 
 
-### generics.jl
-# Generic functions operating on AbstractSparseVector
+### Generic functions operating on AbstractSparseVector
 
 ### getindex
 
@@ -670,8 +671,7 @@ function vcat{Tv,Ti}(X::AbstractSparseVector{Tv,Ti}...)
     SparseVector(len, rnzind, rnzval)
 end
 
-### math.jl
-
+### math functions
 
 ### Unary Map
 
@@ -774,7 +774,7 @@ function _binarymap{Tx,Ty}(f::BinaryOp,
                            mode::Int)
 
     0 <= mode <= 2 || throw(ArgumentError("Incorrect mode $mode."))
-    R = typeof(call(f, zero(Tx), zero(Ty)))
+    R = typeof(f(zero(Tx), zero(Ty)))
     n = length(x)
     length(y) == n || throw(DimensionMismatch())
 
@@ -815,7 +815,7 @@ function _binarymap_mode_0!(f::BinaryOp, mx::Int, my::Int,
         jx = xnzind[ix]
         jy = ynzind[iy]
         if jx == jy
-            v = call(f, xnzval[ix], ynzval[iy])
+            v = f(xnzval[ix], ynzval[iy])
             ir += 1; rind[ir] = jx; rval[ir] = v
             ix += 1; iy += 1
         elseif jx < jy
@@ -837,28 +837,28 @@ function _binarymap_mode_1!{Tx,Ty}(f::BinaryOp, mx::Int, my::Int,
         jx = xnzind[ix]
         jy = ynzind[iy]
         if jx == jy
-            v = call(f, xnzval[ix], ynzval[iy])
+            v = f(xnzval[ix], ynzval[iy])
             if v != zero(v)
                 ir += 1; rind[ir] = jx; rval[ir] = v
             end
             ix += 1; iy += 1
         elseif jx < jy
-            v = call(f, xnzval[ix], zero(Ty))
+            v = f(xnzval[ix], zero(Ty))
             ir += 1; rind[ir] = jx; rval[ir] = v
             ix += 1
         else
-            v = call(f, zero(Tx), ynzval[iy])
+            v = f(zero(Tx), ynzval[iy])
             ir += 1; rind[ir] = jy; rval[ir] = v
             iy += 1
         end
     end
     @inbounds while ix <= mx
-        v = call(f, xnzval[ix], zero(Ty))
+        v = f(xnzval[ix], zero(Ty))
         ir += 1; rind[ir] = xnzind[ix]; rval[ir] = v
         ix += 1
     end
     @inbounds while iy <= my
-        v = call(f, zero(Tx), ynzval[iy])
+        v = f(zero(Tx), ynzval[iy])
         ir += 1; rind[ir] = ynzind[iy]; rval[ir] = v
         iy += 1
     end
@@ -875,19 +875,19 @@ function _binarymap_mode_2!{Tx,Ty}(f::BinaryOp, mx::Int, my::Int,
         jx = xnzind[ix]
         jy = ynzind[iy]
         if jx == jy
-            v = call(f, xnzval[ix], ynzval[iy])
+            v = f(xnzval[ix], ynzval[iy])
             if v != zero(v)
                 ir += 1; rind[ir] = jx; rval[ir] = v
             end
             ix += 1; iy += 1
         elseif jx < jy
-            v = call(f, xnzval[ix], zero(Ty))
+            v = f(xnzval[ix], zero(Ty))
             if v != zero(v)
                 ir += 1; rind[ir] = jx; rval[ir] = v
             end
             ix += 1
         else
-            v = call(f, zero(Tx), ynzval[iy])
+            v = f(zero(Tx), ynzval[iy])
             if v != zero(v)
                 ir += 1; rind[ir] = jy; rval[ir] = v
             end
@@ -895,14 +895,14 @@ function _binarymap_mode_2!{Tx,Ty}(f::BinaryOp, mx::Int, my::Int,
         end
     end
     @inbounds while ix <= mx
-        v = call(f, xnzval[ix], zero(Ty))
+        v = f(xnzval[ix], zero(Ty))
         if v != zero(v)
             ir += 1; rind[ir] = xnzind[ix]; rval[ir] = v
         end
         ix += 1
     end
     @inbounds while iy <= my
-        v = call(f, zero(Tx), ynzval[iy])
+        v = f(zero(Tx), ynzval[iy])
         if v != zero(v)
             ir += 1; rind[ir] = ynzind[iy]; rval[ir] = v
         end
@@ -917,7 +917,7 @@ function _binarymap{Tx,Ty}(f::BinaryOp,
                            mode::Int)
 
     0 <= mode <= 2 || throw(ArgumentError("Incorrect mode $mode."))
-    R = typeof(call(f, zero(Tx), zero(Ty)))
+    R = typeof(f(zero(Tx), zero(Ty)))
     n = length(x)
     length(y) == n || throw(DimensionMismatch())
 
@@ -933,7 +933,7 @@ function _binarymap{Tx,Ty}(f::BinaryOp,
             while ii < j
                 dst[ii] = zero(R); ii += 1
             end
-            dst[j] = call(f, x[j], ynzval[i]); ii += 1
+            dst[j] = f(x[j], ynzval[i]); ii += 1
         end
         @inbounds while ii <= n
             dst[ii] = zero(R); ii += 1
@@ -943,12 +943,12 @@ function _binarymap{Tx,Ty}(f::BinaryOp,
         @inbounds for i = 1:m
             j = ynzind[i]
             while ii < j
-                dst[ii] = call(f, x[ii], zero(Ty)); ii += 1
+                dst[ii] = f(x[ii], zero(Ty)); ii += 1
             end
-            dst[j] = call(f, x[j], ynzval[i]); ii += 1
+            dst[j] = f(x[j], ynzval[i]); ii += 1
         end
         @inbounds while ii <= n
-            dst[ii] = call(f, x[ii], zero(Ty)); ii += 1
+            dst[ii] = f(x[ii], zero(Ty)); ii += 1
         end
     end
     return dst
@@ -960,7 +960,7 @@ function _binarymap{Tx,Ty}(f::BinaryOp,
                            mode::Int)
 
     0 <= mode <= 2 || throw(ArgumentError("Incorrect mode $mode."))
-    R = typeof(call(f, zero(Tx), zero(Ty)))
+    R = typeof(f(zero(Tx), zero(Ty)))
     n = length(x)
     length(y) == n || throw(DimensionMismatch())
 
@@ -976,7 +976,7 @@ function _binarymap{Tx,Ty}(f::BinaryOp,
             while ii < j
                 dst[ii] = zero(R); ii += 1
             end
-            dst[j] = call(f, xnzval[i], y[j]); ii += 1
+            dst[j] = f(xnzval[i], y[j]); ii += 1
         end
         @inbounds while ii <= n
             dst[ii] = zero(R); ii += 1
@@ -986,12 +986,12 @@ function _binarymap{Tx,Ty}(f::BinaryOp,
         @inbounds for i = 1:m
             j = xnzind[i]
             while ii < j
-                dst[ii] = call(f, zero(Tx), y[ii]); ii += 1
+                dst[ii] = f(zero(Tx), y[ii]); ii += 1
             end
-            dst[j] = call(f, xnzval[i], y[j]); ii += 1
+            dst[j] = f(xnzval[i], y[j]); ii += 1
         end
         @inbounds while ii <= n
-            dst[ii] = call(f, zero(Tx), y[ii]); ii += 1
+            dst[ii] = f(zero(Tx), y[ii]); ii += 1
         end
     end
     return dst
@@ -1184,7 +1184,7 @@ function _spdot(f::BinaryOp,
         ix = xnzind[xj]
         iy = ynzind[yj]
         if ix == iy
-            s += call(f, xnzval[xj], ynzval[yj])
+            s += f(xnzval[xj], ynzval[yj])
             xj += 1
             yj += 1
         elseif ix < iy
