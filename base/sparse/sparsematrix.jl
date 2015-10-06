@@ -29,7 +29,7 @@ size(S::SparseMatrixCSC) = (S.m, S.n)
 """
     nnz(A)
 
-Returns the number of stored (filled) elements in a sparse matrix.
+Returns the number of stored (filled) elements in a sparse array.
 """
 nnz(S::SparseMatrixCSC) = Int(S.colptr[end]-1)
 countnz(S::SparseMatrixCSC) = countnz(S.nzval)
@@ -37,8 +37,8 @@ countnz(S::SparseMatrixCSC) = countnz(S.nzval)
 """
     nonzeros(A)
 
-Return a vector of the structural nonzero values in sparse matrix `A`. This
-includes zeros that are explicitly stored in the sparse matrix. The returned
+Return a vector of the structural nonzero values in sparse array `A`. This
+includes zeros that are explicitly stored in the sparse array. The returned
 vector points directly to the internal nonzero storage of `A`, and any
 modifications to the returned vector will mutate `A` as well. See `rowvals(A)`
 and `nzrange(A, col)`.
@@ -46,7 +46,7 @@ and `nzrange(A, col)`.
 nonzeros(S::SparseMatrixCSC) = S.nzval
 
 """
-    rowvals(A)
+    rowvals(A::SparseMatrixCSC)
 
 Return a vector of the row indices of `A`. Any modifications to the returned
 vector will mutate `A` as well. Providing access to how the row indices are
@@ -56,7 +56,7 @@ nonzero values. See also `nonzeros(A)` and `nzrange(A, col)`.
 rowvals(S::SparseMatrixCSC) = S.rowval
 
 """
-    nzrange(A, col)
+    nzrange(A::SparseMatrixCSC, col)
 
 Return the range of indices to the structural nonzero values of a sparse matrix
 column. In conjunction with `nonzeros(A)` and `rowvals(A)`, this allows for
@@ -232,11 +232,11 @@ convert(::Type{Matrix}, S::SparseMatrixCSC) = full(S)
 
 
 """
-    full(S::AbstractSparseArray)
+    full(S)
 
-Convert a sparse matrix `S` into a dense matrix.
+Convert a sparse matrix or vector `S` into a dense matrix or vector.
 """
-full(::AbstractSparseArray)
+full
 
 function full{Tv}(S::SparseMatrixCSC{Tv})
     # Handle cases where zero(Tv) is not defined but the array is dense.
@@ -447,14 +447,15 @@ end
 
 """
 ```rst
-..  sprand([rng,] m,n,p [,rfn])
+..  sprand([rng],m,[n],p::AbstractFloat,[rfn])
 
-Create a random ``m`` by ``n`` sparse matrix, in which the probability of any
-element being nonzero is independently given by ``p`` (and hence the mean
-density of nonzeros is also exactly ``p``). Nonzero values are sampled from
-the distribution specified by ``rfn``. The uniform distribution is used in
-case ``rfn`` is not specified. The optional ``rng`` argument specifies a
-random number generator, see :ref:`Random Numbers <random-numbers>`.
+Create a random length ``m`` sparse vector or ``m`` by ``n`` sparse matrix, in
+which the probability of any element being nonzero is independently given by
+``p`` (and hence the mean density of nonzeros is also exactly ``p``). Nonzero
+values are sampled from the distribution specified by ``rfn``. The uniform
+distribution is used in case ``rfn`` is not specified. The optional ``rng``
+argument specifies a random number generator, see :ref:`Random Numbers
+<random-numbers>`.
 ```
 """
 function sprand{T}(r::AbstractRNG, m::Integer, n::Integer, density::AbstractFloat,
@@ -482,11 +483,11 @@ sprand(m::Integer, n::Integer, density::AbstractFloat) = sprand(GLOBAL_RNG,m,n,d
 sprandn(r::AbstractRNG, m::Integer, n::Integer, density::AbstractFloat) = sprand(r,m,n,density,randn,Float64)
 
 """
-    sprandn(m,n,p)
+    sprandn(m[,n],p::AbstractFloat)
 
-Create a random `m` by `n` sparse matrix with the specified (independent)
-probability `p` of any entry being nonzero, where nonzero values are
-sampled from the normal distribution.
+Create a random sparse vector of length `m` or sparse matrix of size `m` by `n`
+with the specified (independent) probability `p` of any entry being nonzero,
+where nonzero values are sampled from the normal distribution.
 """
 sprandn( m::Integer, n::Integer, density::AbstractFloat) = sprandn(GLOBAL_RNG,m,n,density)
 
@@ -511,10 +512,11 @@ spones{T}(S::SparseMatrixCSC{T}) =
      SparseMatrixCSC(S.m, S.n, copy(S.colptr), copy(S.rowval), ones(T, S.colptr[end]-1))
 
 """
-    spzeros(m,n)
+    spzeros(m[,n])
 
-Create a sparse matrix of size `m x n`. This sparse matrix will not contain any
-nonzero values. No storage will be allocated for nonzero values during construction.
+Create a sparse vector of length `m` or sparse matrix of size `m x n`. This
+sparse array will not contain any nonzero values. No storage will be allocated
+for nonzero values during construction.
 """
 spzeros(m::Integer, n::Integer) = spzeros(Float64, m, n)
 spzeros(Tv::Type, m::Integer, n::Integer) = spzeros(Tv, Int, m, n)
