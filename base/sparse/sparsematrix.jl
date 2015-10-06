@@ -495,10 +495,11 @@ truebools(r::AbstractRNG, n::Integer) = ones(Bool, n)
 sprandbool(r::AbstractRNG, m::Integer, n::Integer, density::AbstractFloat) = sprand(r,m,n,density,truebools,Bool)
 
 """
-    sprandbool(m,n,p)
+    sprandbool(m[,n],p)
 
-Create a random `m` by `n` sparse boolean matrix with the specified
-(independent) probability `p` of any entry being `true`.
+Create a random `m` by `n` sparse boolean matrix or length `m` sparse boolean
+vector with the specified (independent) probability `p` of any entry being
+`true`.
 """
 sprandbool(m::Integer, n::Integer, density::AbstractFloat) = sprandbool(GLOBAL_RNG,m,n,density)
 

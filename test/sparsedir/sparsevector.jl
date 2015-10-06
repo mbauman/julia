@@ -114,24 +114,37 @@ end
 
 # sprand & sprandn
 
-let xr = sprand(1000, 0.3)
+let xr = sprand(1000, 0.9)
     @test isa(xr, SparseVector{Float64,Int})
     @test length(xr) == 1000
     @test all(nonzeros(xr) .>= 0.0)
 end
 
-let xr = sprand(1000, 0.3, Float32)
+let xr = sprand(1000, 0.9, Float32)
     @test isa(xr, SparseVector{Float32,Int})
     @test length(xr) == 1000
     @test all(nonzeros(xr) .>= 0.0)
 end
 
-let xr = sprandn(1000, 0.3)
+let xr = sprandn(1000, 0.9)
     @test isa(xr, SparseVector{Float64,Int})
     @test length(xr) == 1000
-    @test any(nonzeros(xr) .> 0.0) && any(nonzeros(xr) .< 0.0)
+    if !isempty(nonzeros(xr))
+        @test any(nonzeros(xr) .> 0.0) && any(nonzeros(xr) .< 0.0)
+    end
 end
 
+let xr = sprandbool(1000, 0.9)
+    @test isa(xr, SparseVector{Bool,Int})
+    @test length(xr) == 1000
+    @test all(nonzeros(xr))
+end
+
+let r1 = MersenneTwister(), r2 = MersenneTwister()
+    @test sprand(r1, 100, .9) == sprand(r2, 100, .9)
+    @test sprandn(r1, 100, .9) == sprandn(r2, 100, .9)
+    @test sprandbool(r1, 100, .9) == sprandbool(r2, 100, .9)
+end
 
 ### Element access
 

@@ -321,22 +321,30 @@ convert{Tv,TvS,TiS}(::Type{SparseVector{Tv}}, s::SparseVector{TvS,TiS}) =
 
 
 ### Rand Construction
-
-function sprand{T}(n::Integer, p::AbstractFloat, rfn::Function, ::Type{T})
+sprand{T}(n::Integer, p::AbstractFloat, rfn::Function, ::Type{T}) = sprand(GLOBAL_RNG, n, p, rfn, T)
+function sprand{T}(r::AbstractRNG, n::Integer, p::AbstractFloat, rfn::Function, ::Type{T})
     I = randsubseq(1:convert(Int, n), p)
-    V = rfn(T, length(I))
+    V = rfn(r, T, length(I))
     SparseVector(n, I, V)
 end
 
-function sprand(n::Integer, p::AbstractFloat, rfn::Function)
+sprand(n::Integer, p::AbstractFloat, rfn::Function) = sprand(GLOBAL_RNG, n, p, rfn)
+function sprand(r::AbstractRNG, n::Integer, p::AbstractFloat, rfn::Function)
     I = randsubseq(1:convert(Int, n), p)
-    V = rfn(length(I))
+    V = rfn(r, length(I))
     SparseVector(n, I, V)
 end
 
-sprand{T}(n::Integer, p::AbstractFloat, ::Type{T}) = sprand(n, p, rand, T)
-sprand(n::Integer, p::AbstractFloat) = sprand(n, p, rand)
-sprandn(n::Integer, p::AbstractFloat) = sprand(n, p, randn)
+sprand{T}(n::Integer, p::AbstractFloat, ::Type{T}) = sprand(GLOBAL_RNG, n, p, rand, T)
+sprand(n::Integer, p::AbstractFloat) = sprand(GLOBAL_RNG, n, p, rand)
+sprand{T}(r::AbstractRNG, n::Integer, p::AbstractFloat, ::Type{T}) = sprand(r, n, p, rand, T)
+sprand(r::AbstractRNG, n::Integer, p::AbstractFloat) = sprand(r, n, p, rand)
+
+sprandn(n::Integer, p::AbstractFloat) = sprand(GLOBAL_RNG, n, p, randn)
+sprandn(r::AbstractRNG, n::Integer, p::AbstractFloat) = sprand(r, n, p, randn)
+
+sprandbool(n::Integer, p::AbstractFloat) = sprand(GLOBAL_RNG, n, p, Bool)
+sprandbool(r::AbstractRNG, n::Integer, p::AbstractFloat) = sprand(r, n, p, Bool)
 
 ## Indexing into Matrices can return SparseVectors
 
