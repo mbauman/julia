@@ -294,6 +294,7 @@ export
     AbstractSparseMatrix,
     AbstractSparseVector,
     SparseMatrixCSC,
+    SparseVector,
     etree,
     issparse,
     sparse,

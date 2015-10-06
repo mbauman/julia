@@ -946,7 +946,7 @@ dense counterparts. The following functions are specific to sparse arrays.
 
    .. Docstring generated from Julia source
 
-   Create a sparse matrix with the same structure as that of ``S``\ , but with every nonzero element having the value ``1.0``\ .
+   Create a sparse array with the same structure as that of ``S``\ , but with every nonzero element having the value ``1.0``\ .
 
 .. function:: speye(type,m[,n])
 

@@ -55,6 +55,9 @@ similar{T}(x::SparseVector, ::Type{T}, D::Dims) = spzeros(T, D...)
 spzeros(len::Integer) = spzeros(Float64, len)
 spzeros{T}(::Type{T}, len::Integer) = SparseVector(len, Int[], T[])
 
+# Construction of same structure, but with all ones
+spones{T}(x::SparseVector{T}) = SparseVector(x.n, copy(x.nzind), ones(T, length(x.nzval)))
+
 ### Construction from lists of indices and values
 
 function _sparsevector!{Ti<:Integer}(I::Vector{Ti}, V::Vector, len::Integer)

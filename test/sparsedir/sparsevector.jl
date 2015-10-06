@@ -112,6 +112,13 @@ let x = spv_x1
     @test exact_equal(xc, SparseVector(6, [2, 5, 6], [1.25, -0.75, 3.5]))
 end
 
+# spones - copies structure, but replaces nzvals with ones
+let x = SparseVector(8, [2, 3, 6], [12.0, 18.0, 25.0])
+    y = spones(x)
+    @test (x .!= 0) == (y .!= 0)
+    @test y == SparseVector(8, [2, 3, 6], [1.0, 1.0, 1.0])
+end
+
 # sprand & sprandn
 
 let xr = sprand(1000, 0.9)

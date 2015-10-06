@@ -506,7 +506,7 @@ sprandbool(m::Integer, n::Integer, density::AbstractFloat) = sprandbool(GLOBAL_R
 """
     spones(S)
 
-Create a sparse matrix with the same structure as that of `S`, but with every nonzero
+Create a sparse array with the same structure as that of `S`, but with every nonzero
 element having the value `1.0`.
 """
 spones{T}(S::SparseMatrixCSC{T}) =
