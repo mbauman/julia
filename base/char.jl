@@ -42,6 +42,10 @@ isless(x::Integer, y::Char) = isless(x, UInt32(y))
 +(x::Char, y::Integer) = Char(Int32(x) + Int32(y))
 +(x::Integer, y::Char) = y + x
 
+zero(::Char) = '\0'
+zero(::Type{Char}) = '\0'
+
+
 bswap(x::Char) = Char(bswap(UInt32(x)))
 
 print(io::IO, c::Char) = (write(io, c); nothing)
