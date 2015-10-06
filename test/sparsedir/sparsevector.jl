@@ -1,4 +1,4 @@
-## sparsevec.jl
+# This file is a part of Julia. License is MIT: http://julialang.org/license
 
 ### Data
 
@@ -297,7 +297,7 @@ let m = 80, n = 100
 end
 
 
-## sparsemat.jl
+## sparsemat: combinations with sparse matrix
 
 let S = sprand(4, 8, 0.5)
     Sf = full(S)
@@ -332,7 +332,7 @@ let S = sprand(4, 8, 0.5)
     end
 end
 
-## math.jl
+## math
 
 ### Data
 
@@ -501,7 +501,7 @@ let x = spzeros(Float64, 8)
 end
 
 
-### linalg.jl
+### linalg
 
 ### BLAS Level-1
 
