@@ -205,8 +205,8 @@ function getindex(V::FastSubArray, I::Int...)
 end
 
 # Now here we can get tricky: when 1 < LD < length(I), we can sometimes use linear indexing!
-strides2ind(strides::Tuple, I::Tuple) = strides2ind(0, strides, I)
-strides2ind(v, strides::Tuple, I::Tuple) = strides2ind(v + strides[1] * (I[1]-1), tail(strides), tail(I))
+strides2ind(strides::Tuple, I::Tuple) = (@_inline_meta; strides2ind(0, strides, I))
+strides2ind(v, strides::Tuple, I::Tuple) = (@_inline_meta; strides2ind(v + strides[1] * (I[1]-1), tail(strides), tail(I)))
 strides2ind(v, strides::Tuple, I::Tuple{}) = v
 @generated function getindex{T,SN,P,SI,LD}(V::SubArray{T,SN,P,SI,LD}, I::Int...)
     N = length(I)
