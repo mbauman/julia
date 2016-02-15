@@ -220,7 +220,7 @@ function runtests(A::Array, I...)
     # sub
     S = sub(A, I...)
     if Base.iscontiguous(S)
-        @test S.stride1 == 1
+        @test stride(S, 1) == 1
     end
     test_linear(S, C)
     test_cartesian(S, C)
