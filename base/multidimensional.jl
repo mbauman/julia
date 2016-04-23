@@ -437,82 +437,47 @@ end
 #
 # It returns a CartesianIndex or array of CartesianIndexes.
 
-# Checking 'in' a range is fast -- so check all possibilities and keep the good ones
-@generated function merge_indexes{N}(V, indexes::NTuple{N}, index::Union{Colon, Range})
-    # There may be a vector of cartesian indices in the passed indexes... which
-    # makes the number of indices more than N. Since we pre-allocate the array
-    # of CartesianIndexes, we need to figure out how big to make it
-    M = 0
-    for T in indexes.parameters
-        T <: CartesianIndex ? (M += length(T)) : (M += 1)
-    end
-    index_length_expr = index <: Colon ? symbol(string("Istride_", N+1)) : :(length(index))
-    quote
-        Cartesian.@nexprs $N d->(I_d = indexes[d])
-        dimlengths = Cartesian.@ncall $N index_lengths_dim V.parent length(V.indexes)-N+1 I
-        Istride_1 = 1   # strides of the indexes to merge
-        Cartesian.@nexprs $N d->(Istride_{d+1} = Istride_d*dimlengths[d])
-        idx_len = $(index_length_expr)
-        if idx_len < 0.1*$(symbol(string("Istride_", N+1)))   # this has not been carefully tuned
-            return merge_indexes_div(V, indexes, index, dimlengths)
-        end
-        Cartesian.@nexprs $N d->(counter_d = 1) # counter_0 is the linear index
-        k = 0
-        merged = Array(CartesianIndex{$M}, idx_len)
-        Cartesian.@nloops $N i d->(1:dimlengths[d]) d->(counter_{d-1} = counter_d + (i_d-1)*Istride_d; @inbounds idx_d = I_d[i_d]) begin
-            if counter_0 in index # this branch is elided for ::Colon
-                @inbounds merged[k+=1] = Cartesian.@ncall $N CartesianIndex{$M} idx
-            end
-        end
-        merged
-    end
+# Unlike SubArray's reindex, merging indices doesn't drop any indices.
+immutable MergedIndexes{N,I} <: AbstractArray{CartesianIndex{N}, N}
+    indexes::I # <: NTuple{N}
+    dims::NTuple{N, Int}
+end
+size(m::MergedIndexes) = m.dims
+@inline function getindex(m::MergedIndexes, I::Int...)
+    @boundscheck checkbounds(m, I...)
+    CartesianIndex(inlinemap(getindex, m.indexes, I))
 end
 
-# mapping getindex across the parent and subindices rapidly gets too big to
+# mapping getindex across the stored indices rapidly gets too big to
 # automatically inline, but it is crucial that it does so to avoid allocations
-# Unlike SubArray's reindex, merge_indexes doesn't drop any indices.
 @inline inlinemap(f, t::Tuple, s::Tuple) = (f(t[1], s[1]), inlinemap(f, tail(t), tail(s))...)
 inlinemap(f, t::Tuple{}, s::Tuple{}) = ()
 inlinemap(f, t::Tuple{}, s::Tuple) = ()
 inlinemap(f, t::Tuple, s::Tuple{}) = ()
 
-# Otherwise, we fall back to the slow div/rem method, using ind2sub.
 @inline merge_indexes{N}(V, indexes::NTuple{N}, index) =
-    merge_indexes_div(V, indexes, index, index_lengths_dim(V.parent, length(V.indexes)-N+1, indexes...))
+    merge_indexes(V, indexes, index, index_lengths_dim(V.parent, length(V.indexes)-N+1, indexes...))
 
-@inline merge_indexes_div{N}(V, indexes::NTuple{N}, index::Real, dimlengths) =
+@inline merge_indexes{N}(V, indexes::NTuple{N}, index::Real, dimlengths) =
     CartesianIndex(inlinemap(getindex, indexes, ind2sub(dimlengths, index)))
-merge_indexes_div{N}(V, indexes::NTuple{N}, index::AbstractArray, dimlengths) =
-    reshape([CartesianIndex(inlinemap(getindex, indexes, ind2sub(dimlengths, i))) for i in index], size(index))
-merge_indexes_div{N}(V, indexes::NTuple{N}, index::Colon, dimlengths) =
-    [CartesianIndex(inlinemap(getindex, indexes, ind2sub(dimlengths, i))) for i in 1:prod(dimlengths)]
+merge_indexes{N}(V, indexes::NTuple{N}, index, dimlengths) =
+    sub(reshape(MergedIndexes(indexes, dimlengths), prod(dimlengths)), index)
+merge_indexes{N}(V, indexes::NTuple{N}, index::Colon, dimlengths) =
+    reshape(MergedIndexes(indexes, dimlengths), prod(dimlengths))
 
 # Merging indices is particularly difficult in the case where we partially linearly
-# index through a multidimensional array. It's easiest if we can simply reduce the
-# partial indices to a single linear index into the parent index array.
-function merge_indexes{N}(V, indexes::NTuple{N}, index::Tuple{Colon, Vararg{Colon}})
-    shape = index_shape(indexes[1], index...)
-    reshape(merge_indexes(V, indexes, :), (shape[1:end-1]..., shape[end]*prod(index_lengths_dim(V.parent, length(V.indexes)-length(indexes)+2, tail(indexes)...))))
-end
-@inline merge_indexes{N}(V, indexes::NTuple{N}, index::Tuple{Real, Vararg{Real}}) = merge_indexes(V, indexes, sub2ind(size(indexes[1]), index...))
-# In general, it's a little trickier, but we can use the product iterator
-# if we replace colons with ranges. This can be optimized further.
-function merge_indexes{N}(V, indexes::NTuple{N}, index::Tuple)
-    I = replace_colons(V, indexes, index)
-    shp = index_shape(indexes[1], I...) # index_shape does no bounds checking
-    dimlengths = index_lengths_dim(V.parent, length(V.indexes)-N+1, indexes...)
-    sz = size(indexes[1])
-    reshape([CartesianIndex(inlinemap(getindex, indexes, ind2sub(dimlengths, sub2ind(sz, i...)))) for i in product(I...)], shp)
-end
-@inline replace_colons(V, indexes, I) = replace_colons_dim(V, indexes, 1, I)
-@inline replace_colons_dim(V, indexes, dim, I::Tuple{}) = ()
-@inline replace_colons_dim(V, indexes, dim, I::Tuple{Colon}) =
-    (1:trailingsize(indexes[1], dim)*prod(index_lengths_dim(V.parent, length(V.indexes)-length(indexes)+2, tail(indexes)...)),)
-@inline replace_colons_dim(V, indexes, dim, I::Tuple{Colon, Vararg{Any}}) =
-    (1:size(indexes[1], dim), replace_colons_dim(V, indexes, dim+1, tail(I))...)
-@inline replace_colons_dim(V, indexes, dim, I::Tuple{Any, Vararg{Any}}) =
-    (I[1], replace_colons_dim(V, indexes, dim+1, tail(I))...)
+# index through a multidimensional array. When this occurs, merge_indexes gets the
+# tuple of indices that partially (but not completely) index into the parent's
+# indexes[1].
 
+# When it's a scalar index, just back it up to a linear index into the parent index
+@inline merge_indexes{N}(V, indexes::NTuple{N}, index::Tuple{Real, Vararg{Real}}, dimlengths) =
+    CartesianIndex(inlinemap(getindex, indexes, ind2sub(dimlengths, sub2ind(size(indexes[1]), index...))))
+# Otherwise, just merge the indices and reshape it to the proper size
+@inline function merge_indexes{N}(V, indexes::NTuple{N}, index::Tuple, dimlengths)
+    shape = index_shape(indexes[1], index...)
+    sub(reshape(MergedIndexes(V, indexes, :), (front(shape)..., shape[end]*prod(tail(dimlengths)))), index...)
+end
 
  cumsum(A::AbstractArray, axis::Integer=1) =  cumsum!(similar(A, Base._cumsum_type(A)), A, axis)
 cumsum!(B, A::AbstractArray) = cumsum!(B, A, 1)
