@@ -101,7 +101,7 @@ struct DefaultArrayStyle{N} <: AbstractArrayStyle{N} end
 const DefaultVectorStyle = DefaultArrayStyle{1}
 const DefaultMatrixStyle = DefaultArrayStyle{2}
 BroadcastStyle(::Type{<:AbstractArray{T,N}}) where {T,N} = DefaultArrayStyle{N}()
-BroadcastStyle(::Type{<:Ref}) = DefaultArrayStyle{0}()
+BroadcastStyle(::Type{<:Base.RefValue}) = DefaultArrayStyle{0}()
 
 # `ArrayConflict` is an internal type signaling that two or more different `AbstractArrayStyle`
 # objects were supplied as arguments, and that no rule was defined for resolving the
@@ -419,12 +419,6 @@ end
     end
 end
 
-struct ScalarArray{T} <: AbstractArray{T,0}
-    val::T
-end
-Base.size(::ScalarArray) = ()
-Base.getindex(S::ScalarArray) = S.val
-
 collect_unknowns() = ()
 @inline collect_unknowns(x, rest...) = (collect_unknown(x), collect_unknowns(rest...)...)
 @inline collect_unknown(x) = collect_unknown(BroadcastStyle(typeof(x)), x)
@@ -432,8 +426,9 @@ collect_unknown(::BroadcastStyle, x) = x
 collect_unknown(::Unknown, x) = broadcast_collect(x)
 
 broadcast_collect(x) = collect(x)
-broadcast_collect(x::Union{Number,Symbol,String,Type,Function,Uninitialized,Nothing,RoundingMode,Ptr}) = ScalarArray(x)
-broadcast_collect(::Type{T}) where {T} = ScalarArray{Type{T}}(T)
+broadcast_collect(x::Union{Number,Symbol,String,Type,Function,Uninitialized,Nothing,RoundingMode}) = Ref(x)
+broadcast_collect(x::Ptr) = Base.RefValue(x) # Cannot use Ref(::Ptr) until ambiguous deprecation goes through
+broadcast_collect(::Type{T}) where {T} = Base.RefValue{Type{T}}(T)
 
 """
     broadcast!(f, dest, As...)
@@ -535,6 +530,7 @@ maptoTuple(f, a, b...) = Tuple{f(a), maptoTuple(f, b...).types...}
 # )::_broadcast_getindex_eltype(A)
 _broadcast_getindex_eltype(A) = _broadcast_getindex_eltype(combine_styles(A), A)
 _broadcast_getindex_eltype(::BroadcastStyle, A) = eltype(A)  # Tuple, Array, etc.
+_broadcast_getindex_eltype(::DefaultArrayStyle{0}, ::Base.RefValue{T}) where {T} = T
 
 # Inferred eltype of result of broadcast(f, xs...)
 combine_eltypes(f, A, As...) =

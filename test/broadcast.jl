@@ -545,7 +545,7 @@ end
 # Test that broadcast treats type arguments as scalars, i.e. containertype yields Any,
 # even for subtypes of abstract array. (https://github.com/JuliaStats/DataArrays.jl/issues/229)
 @testset "treat type arguments as scalars, DataArrays issue 229" begin
-    @test Broadcast.combine_styles(AbstractArray) == Broadcast.Scalar()
+    @test Broadcast.combine_styles(AbstractArray) == Broadcast.Unknown()
     @test broadcast(==, [1], AbstractArray) == BitArray([false])
     @test broadcast(==, 1, AbstractArray) == fill(false)
 end

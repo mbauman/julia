@@ -939,6 +939,8 @@ end
 
 nonscalararg(::SparseVecOrMat) = true
 nonscalararg(::Any) = false
+scalarwrappedarg(::Union{AbstractArray{<:Any,0},Ref}) = true
+scalarwrappedarg(::Any) = false
 
 @inline function _capturescalars()
     return (), () -> ()
@@ -947,6 +949,8 @@ end
     let (rest, f) = _capturescalars(mixedargs...)
         if nonscalararg(arg)
             return (arg, rest...), (head, tail...) -> (head, f(tail...)...) # pass-through to broadcast
+        elseif scalarwrappedarg(arg)
+            return rest, (tail...) -> (arg[], f(tail...)...) # unwrap and add back scalararg after (in makeargs)
         else
             return rest, (tail...) -> (arg, f(tail...)...) # add back scalararg after (in makeargs)
         end
@@ -955,6 +959,8 @@ end
 @inline function _capturescalars(arg) # this definition is just an optimization (to bottom out the recursion slightly sooner)
     if nonscalararg(arg)
         return (arg,), (head,) -> (head,) # pass-through
+    elseif scalarwrappedarg(arg)
+        return (), () -> (arg[],) # unwrap
     else
         return (), () -> (arg,) # add scalararg
     end
@@ -992,6 +998,8 @@ BroadcastStyle(::Type{<:Adjoint{T,<:Vector}}) where T = Broadcast.MatrixStyle() 
 BroadcastStyle(::Type{<:Transpose{T,<:Vector}}) where T = Broadcast.MatrixStyle() # Transpose not yet defined when broadcast.jl loaded
 Broadcast.BroadcastStyle(::SPVM, ::Broadcast.VectorStyle) = PromoteToSparse()
 Broadcast.BroadcastStyle(::SPVM, ::Broadcast.MatrixStyle) = PromoteToSparse()
+Broadcast.BroadcastStyle(s::SPVM, ::Broadcast.AbstractArrayStyle{0}) = s
+Broadcast.BroadcastStyle(s::SPVM, ::Broadcast.DefaultArrayStyle{0}) = s
 Broadcast.BroadcastStyle(::SparseVecStyle, ::Broadcast.DefaultArrayStyle{N}) where N =
     Broadcast.DefaultArrayStyle(Broadcast._max(Val(N), Val(1)))
 Broadcast.BroadcastStyle(::SparseMatStyle, ::Broadcast.DefaultArrayStyle{N}) where N =
