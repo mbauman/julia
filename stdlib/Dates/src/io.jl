@@ -376,8 +376,7 @@ function Base.show(io::IO, df::DateFormat)
     end
     write(io, '"')
 end
-
-Base.Broadcast.BroadcastStyle(::Type{<:DateFormat}) = Base.Broadcast.Scalar()
+Base.Broadcast.broadcast_collect(x::DateFormat) = Ref(x)
 
 """
     dateformat"Y-m-d H:M:S"
