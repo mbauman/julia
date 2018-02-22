@@ -51,13 +51,6 @@ BroadcastStyle(::Type{Union{}}) = Unknown()  # ambiguity resolution
 BroadcastStyle(::Type) = Unknown()
 
 """
-`Broadcast.Scalar()` is a [`BroadcastStyle`](@ref) indicating that an object is not
-treated as a container for the purposes of broadcasting.
-"""
-struct Scalar <: BroadcastStyle end
-BroadcastStyle(::Type{<:Union{Number,Symbol,String,Type,Function,Uninitialized,Nothing,RoundingMode,Ptr}}) = Scalar()
-
-"""
 `Broadcast.AbstractArrayStyle{N} <: BroadcastStyle` is the abstract supertype for any style
 associated with an `AbstractArray` type.
 The `N` parameter is the dimensionality, which can be handy for AbstractArray types
@@ -429,17 +422,18 @@ end
 struct ScalarArray{T} <: AbstractArray{T,0}
     val::T
 end
-ScalarArray(::Type{T}) where {T} = ScalarArray{Type{T}}(T)
 Base.size(::ScalarArray) = ()
 Base.getindex(S::ScalarArray) = S.val
 
 collect_unknowns() = ()
 @inline collect_unknowns(x, rest...) = (collect_unknown(x), collect_unknowns(rest...)...)
 @inline collect_unknown(x) = collect_unknown(BroadcastStyle(typeof(x)), x)
-collect_unknown(::Any, x) = x
-collect_unknown(::Scalar, ::Type{T}) where {T} = ScalarArray(T)
-collect_unknown(::Scalar, x) = ScalarArray(x)
-collect_unknown(::Unknown, x) = collect(x)
+collect_unknown(::BroadcastStyle, x) = x
+collect_unknown(::Unknown, x) = broadcast_collect(x)
+
+broadcast_collect(x) = collect(x)
+broadcast_collect(x::Union{Number,Symbol,String,Type,Function,Uninitialized,Nothing,RoundingMode,Ptr}) = ScalarArray(x)
+broadcast_collect(::Type{T}) where {T} = ScalarArray{Type{T}}(T)
 
 """
     broadcast!(f, dest, As...)
