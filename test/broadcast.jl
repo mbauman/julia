@@ -28,13 +28,13 @@ check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,5))
 check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,1))
 check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3))
 check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,5), zeros(3))
-check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,5), 1)
-check_broadcast_indices((OneTo(3),OneTo(5)), 5, 2)
+# check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,5), 1)
+# check_broadcast_indices((OneTo(3),OneTo(5)), 5, 2)
 @test_throws DimensionMismatch check_broadcast_indices((OneTo(3),OneTo(5)), zeros(2,5))
 @test_throws DimensionMismatch check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,4))
 @test_throws DimensionMismatch check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,4,2))
 @test_throws DimensionMismatch check_broadcast_indices((OneTo(3),OneTo(5)), zeros(3,5), zeros(2))
-check_broadcast_indices((-1:1, 6:9), 1)
+# check_broadcast_indices((-1:1, 6:9), 1)
 
 check_broadcast_shape((-1:1, 6:9), (-1:1, 6:9))
 check_broadcast_shape((-1:1, 6:9), (-1:1, 1))
@@ -170,7 +170,7 @@ rt = Base.return_types(broadcast!, Tuple{Function, Array{Float64, 3}, Array{Floa
 let x = [1,3.2,4.7], y = [3.5, pi, 1e-4], α = 0.2342
     @test sin.(x) == broadcast(sin, x)
     @test sin.(α) == broadcast(sin, α)
-    @test sin.(3.2) == broadcast(sin, 3.2) == sin(3.2)
+    @test sin.(3.2) == broadcast(sin, 3.2) == fill(sin(3.2))
     @test factorial.(3) == broadcast(factorial, 3)
     @test atan2.(x, y) == broadcast(atan2, x, y)
     @test atan2.(x, y') == broadcast(atan2, x, y')
@@ -195,8 +195,8 @@ let a = broadcast(Float32, [3, 4, 5])
 end
 
 # broadcasting scalars:
-@test sin.(1) === broadcast(sin, 1) === sin(1)
-@test (()->1234).() === broadcast(()->1234) === 1234
+@test sin.(1) == broadcast(sin, 1) == fill(sin(1))
+@test (()->1234).() == broadcast(()->1234) == fill(1234)
 
 # issue #4883
 @test isa(broadcast(tuple, [1 2 3], ["a", "b", "c"]), Matrix{Tuple{Int,String}})
@@ -237,7 +237,7 @@ let x = sin.(1:10), a = [x]
     @test atan2.(x, cos.(x)) == atan2.(a..., cos.(x)) == broadcast(atan2, x, cos.(a...)) == broadcast(atan2, a..., cos.(a...))
     @test ((args...)->cos(args[1])).(x) == cos.(x) == ((y,args...)->cos(y)).(x)
 end
-@test atan2.(3,4) == atan2(3,4) == (() -> atan2(3,4)).()
+@test atan2.(3,4) == fill(atan2(3,4)) == (() -> atan2(3,4)).()
 # fusion with keyword args:
 let x = [1:4;]
     f17300kw(x; y=0) = x + y
@@ -368,7 +368,7 @@ let A17984 = []
 end
 
 # Issue #16966
-@test parse.(Int, "1") == 1
+@test parse.(Int, "1") == fill(1)
 @test parse.(Int, ["1", "2"]) == [1, 2]
 @test trunc.((Int,), [1.2, 3.4]) == [1, 3]
 @test abs.((1, -2)) == (1, 2)
@@ -407,7 +407,7 @@ let
 end
 
 # Ref as 0-dimensional array for broadcast
-@test (-).(C_NULL, C_NULL)::UInt == 0
+@test (-).(C_NULL, C_NULL)::Array{UInt,0} == fill(0)
 @test (+).(1, Ref(2)) == fill(3)
 @test (+).(Ref(1), Ref(2)) == fill(3)
 @test (+).([[0,2], [1,3]], Ref{Vector{Int}}([1,-1])) == [[1,1], [2,2]]
@@ -547,7 +547,7 @@ end
 @testset "treat type arguments as scalars, DataArrays issue 229" begin
     @test Broadcast.combine_styles(AbstractArray) == Broadcast.Scalar()
     @test broadcast(==, [1], AbstractArray) == BitArray([false])
-    @test broadcast(==, 1, AbstractArray) == false
+    @test broadcast(==, 1, AbstractArray) == fill(false)
 end
 
 # Test that broadcasting identity where the input and output Array shapes do not match

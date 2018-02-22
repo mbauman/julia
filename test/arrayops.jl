@@ -41,8 +41,8 @@ using Random, LinearAlgebra
 
     @test isequal(1 .<< [1,2,5], [2,4,32])
     @test isequal(128 .>> [1,2,5], [64,32,4])
-    @test isequal(2 .>> 1, 1)
-    @test isequal(1 .<< 1, 2)
+    @test isequal(2 .>> 1, fill(1))
+    @test isequal(1 .<< 1, fill(2))
     @test isequal([1,2,5] .<< [1,2,5], [2,8,160])
     @test isequal([10,20,50] .>> [1,2,5], [5,5,1])
 
