@@ -79,10 +79,10 @@ import Base.<
 
 @test isless('a','b')
 
-@test 1 .!= 2
-@test 1 .== 1
-@test 1 .< 2
-@test 1 .<= 2
+@test (1 .!= 2)[]
+@test (1 .== 1)[]
+@test (1 .< 2)[]
+@test (1 .<= 2)[]
 
 # issue #13144: max() with 4 or more array arguments
 let xs = [[i:i+4;] for i in 1:10]

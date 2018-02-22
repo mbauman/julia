@@ -120,7 +120,7 @@ function var(iterable; corrected::Bool=true, mean=nothing)
     end
 end
 
-centralizedabs2fun(m) = x -> abs2.(x - m)
+centralizedabs2fun(m) = x -> abs2(x - m)
 centralize_sumabs2(A::AbstractArray, m) =
     mapreduce(centralizedabs2fun(m), +, A)
 centralize_sumabs2(A::AbstractArray, m, ifirst::Int, ilast::Int) =
