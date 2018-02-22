@@ -999,7 +999,8 @@ BroadcastStyle(::Type{<:Transpose{T,<:Vector}}) where T = Broadcast.MatrixStyle(
 Broadcast.BroadcastStyle(::SPVM, ::Broadcast.VectorStyle) = PromoteToSparse()
 Broadcast.BroadcastStyle(::SPVM, ::Broadcast.MatrixStyle) = PromoteToSparse()
 Broadcast.BroadcastStyle(s::SPVM, ::Broadcast.AbstractArrayStyle{0}) = s
-Broadcast.BroadcastStyle(s::SPVM, ::Broadcast.DefaultArrayStyle{0}) = s
+Broadcast.BroadcastStyle(s::SparseVecStyle, ::Broadcast.DefaultArrayStyle{0}) = s
+Broadcast.BroadcastStyle(s::SparseMatStyle, ::Broadcast.DefaultArrayStyle{0}) = s
 Broadcast.BroadcastStyle(::SparseVecStyle, ::Broadcast.DefaultArrayStyle{N}) where N =
     Broadcast.DefaultArrayStyle(Broadcast._max(Val(N), Val(1)))
 Broadcast.BroadcastStyle(::SparseMatStyle, ::Broadcast.DefaultArrayStyle{N}) where N =
