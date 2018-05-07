@@ -221,7 +221,7 @@ function _mapreducedim!(f, op, R::AbstractArray, A::AbstractArray)
     keep, Idefault = Broadcast.shapeindexer(indsRt)
     if reducedim1(R, A)
         # keep the accumulator as a local variable when reducing along the first dimension
-        i1 = first(indices1(R))
+        i1 = first(axes1(R))
         @inbounds for IA in CartesianIndices(indsAt)
             IR = Broadcast.newindex(IA, keep, Idefault)
             r = R[i1,IR]
@@ -672,7 +672,7 @@ function findminmax!(f, Rval, Rind, A::AbstractArray{T,N}) where {T,N}
     k, kss = next(ks, start(ks))
     zi = zero(eltype(ks))
     if reducedim1(Rval, A)
-        i1 = first(indices1(Rval))
+        i1 = first(axes1(Rval))
         @inbounds for IA in CartesianIndices(indsAt)
             IR = Broadcast.newindex(IA, keep, Idefault)
             tmpRv = Rval[i1,IR]
@@ -802,4 +802,4 @@ function _findmax(A, region)
     end
 end
 
-reducedim1(R, A) = length(indices1(R)) == 1
+reducedim1(R, A) = length(axes1(R)) == 1

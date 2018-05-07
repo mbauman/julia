@@ -78,14 +78,14 @@ Base.size(A::OffsetArray, d) = errmsg(A)
 Base.eachindex(::IndexCartesian, A::OffsetArray) = CartesianIndices(axes(A))
 Base.eachindex(::IndexLinear, A::OffsetVector) = axes(A, 1)
 
-# Implementations of indices and indices1. Since bounds-checking is
+# Implementations of axes and axes1. Since bounds-checking is
 # performance-critical and relies on indices, these are usually worth
 # optimizing thoroughly.
 @inline Base.axes(A::OffsetArray, d) = 1 <= d <= length(A.offsets) ? axes(parent(A))[d] .+ A.offsets[d] : (1:1)
 @inline Base.axes(A::OffsetArray) = _indices(axes(parent(A)), A.offsets)  # would rather use ntuple, but see #15276
 @inline _indices(inds, offsets) = (inds[1] .+ offsets[1], _indices(tail(inds), tail(offsets))...)
 _indices(::Tuple{}, ::Tuple{}) = ()
-Base.indices1(A::OffsetArray{T,0}) where {T} = 1:1  # we only need to specialize this one
+Base.axes1(A::OffsetArray{T,0}) where {T} = 1:1  # we only need to specialize this one
 
 function Base.similar(A::OffsetArray, T::Type, dims::Dims)
     B = similar(parent(A), T, dims)
