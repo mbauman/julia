@@ -213,13 +213,13 @@ module IteratorsMD
 
     For cartesian to linear index conversion, see [`LinearIndices`](@ref).
     """
-    struct CartesianIndices{N,R<:NTuple{N,AbstractUnitRange{Int}}} <: AbstractArray{CartesianIndex{N},N}
+    struct CartesianIndices{T,N,R} <: AbstractArray{CartesianIndex{T},N}
         indices::R
     end
 
     CartesianIndices(::Tuple{}) = CartesianIndices{0,typeof(())}(())
     CartesianIndices(inds::NTuple{N,AbstractUnitRange{Int}}) where {N} =
-        CartesianIndices{N,typeof(inds)}(inds)
+        CartesianIndices{Int,N,typeof(inds)}(inds)
     CartesianIndices(inds::NTuple{N,AbstractUnitRange{<:Integer}}) where {N} =
         CartesianIndices(map(r->convert(AbstractUnitRange{Int}, r), inds))
 

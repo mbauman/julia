@@ -339,27 +339,28 @@ julia> linear[1,2]
 4
 ```
 """
-struct LinearIndices{N,R<:NTuple{N,AbstractUnitRange{Int}}} <: AbstractArray{Int,N}
+struct LinearIndices{T,N,R} <: AbstractArray{T,N}
     indices::R
 end
 
-LinearIndices(::Tuple{}) = LinearIndices{0,typeof(())}(())
-LinearIndices(inds::NTuple{N,AbstractUnitRange{Int}}) where {N} = LinearIndices{N,typeof(inds)}(inds)
-LinearIndices(inds::NTuple{N,AbstractUnitRange{<:Integer}}) where {N} =
-    LinearIndices(map(r->convert(AbstractUnitRange{Int}, r), inds))
-LinearIndices(sz::NTuple{N,<:Integer}) where {N} = LinearIndices(map(Base.OneTo, sz))
-LinearIndices(inds::NTuple{N,Union{<:Integer,AbstractUnitRange{<:Integer}}}) where {N} =
-    LinearIndices(map(i->first(i):last(i), inds))
+LinearIndices(::Tuple{}) = LinearIndices{Int,0,typeof(())}(())
+LinearIndices(inds::NTuple{N,AbstractUnitRange{<:Union{Int,BitIntegerSmall}}}) where {N} =
+    LinearIndices{Int,N,typeof(inds)}(inds)
+LinearIndices(inds::NTuple{N,AbstractUnitRange{T}}) where {N,T} =
+    LinearIndices{T,N,typeof(inds)}(inds)
+LinearIndices(sz::NTuple{N,<:Integer}) where {N} = LinearIndices(map(OneTo, sz))
+LinearIndices(inds::NTuple{N,Union{Integer,AbstractUnitRange{<:Integer}}}) where {N} =
+    LinearIndices(map(i->i isa Integer ? OneTo(i) : i, inds))
 LinearIndices(A::Union{AbstractArray,SimpleVector}) = LinearIndices(axes(A))
 
 # AbstractArray implementation
 IndexStyle(::Type{<:LinearIndices}) = IndexLinear()
 axes(iter::LinearIndices) = iter.indices
 size(iter::LinearIndices) = map(unsafe_length, iter.indices)
-function getindex(iter::LinearIndices, i::Int)
+function getindex(iter::LinearIndices{T}, i::Integer) where T
     @_inline_meta
     @boundscheck checkbounds(iter, i)
-    i
+    T(i)
 end
 function getindex(iter::LinearIndices, i::AbstractRange{<:Integer})
     @_inline_meta
