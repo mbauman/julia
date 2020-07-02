@@ -917,6 +917,18 @@ preprocess(dest, x) = extrude(broadcast_unalias(dest, x))
 preprocess_args(dest, args::Tuple{Any}) = (preprocess(dest, args[1]),)
 preprocess_args(dest, args::Tuple{}) = ()
 
+multithreading_safe(bc::Broadcast.Broadcasted) = is_threadsafe_function(bc.f) && all(multithreading_safe, bc.args)
+multithreading_safe(::Dict) = false
+multithreading_safe(::Array) = true
+multithreading_safe(::Extruded{<:Array}) = true
+multithreading_safe(::Number) = true
+multithreading_safe(_) = false
+is_threadsafe_function(::typeof(isless)) = true
+is_threadsafe_function(::typeof(<)) = true
+is_threadsafe_function(::typeof(+)) = true
+is_threadsafe_function(::typeof(ifelse)) = true
+is_threadsafe_function(_) = false
+
 # Specialize this method if all you want to do is specialize on typeof(dest)
 @inline function copyto!(dest::AbstractArray, bc::Broadcasted{Nothing})
     axes(dest) == axes(bc) || throwdm(axes(dest), axes(bc))
@@ -928,8 +940,18 @@ preprocess_args(dest, args::Tuple{}) = ()
         end
     end
     bc′ = preprocess(dest, bc)
-    @simd for I in eachindex(bc′)
-        @inbounds dest[I] = bc′[I]
+    if multithreading_safe(bc′) && ndims(bc′) == 2
+        CI = eachindex(bc′)
+        # outer loop
+        Threads.@threads for I in CI.indices[2]
+            @simd for j in CI.indices[1]
+                dest[j, I] = bc′[j, I]
+            end
+        end
+    else
+        @simd for I in eachindex(bc′)
+            @inbounds dest[I] = bc′[I]
+        end
     end
     return dest
 end
