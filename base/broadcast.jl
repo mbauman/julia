@@ -943,8 +943,8 @@ is_threadsafe_function(_) = false
     if multithreading_safe(bc′) && ndims(bc′) == 2
         CI = eachindex(bc′)
         # outer loop
-        Threads.@threads for I in CI.indices[2]
-            @simd for j in CI.indices[1]
+        @sync for I in CI.indices[2]
+            Threads.@spawn @simd for j in CI.indices[1]
                 dest[j, I] = bc′[j, I]
             end
         end
