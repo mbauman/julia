@@ -308,6 +308,19 @@ reindex(idxs::Tuple{AbstractMatrix, Vararg{Any}}, subidxs::Tuple{Any, Any, Varar
     end
 end
 
+# SubArray bounds checking is just like reindex: check the bounds of indexing into the indices.
+# The bounds of the parent are checked at construction and documented to be skipped subsequently.
+checkbounds(::Type{Bool}, V::SubArray{<:Any,N}, I::Vararg{Any,N}) where {N} = reindex_checkbounds(V.indices, I)
+reindex_checkbounds(::Tuple{}, ::Tuple{}) = true
+reindex_checkbounds(idxs::Tuple{ScalarIndex, Vararg{Any}}, subidxs::Tuple{Vararg{Any}}) =
+    (@inline; reindex_checkbounds(tail(idxs), subidxs))
+reindex_checkbounds(idxs::Tuple{AbstractVector, Vararg{Any}}, subidxs::Tuple{Any, Vararg{Any}}) =
+    (@inline; checkbounds(Bool, idxs[1], subidxs[1]) && reindex_checkbounds(tail(idxs), tail(subidxs)))
+reindex_checkbounds(idxs::Tuple{AbstractMatrix, Vararg{Any}}, subidxs::Tuple{Any, Any, Vararg{Any}}) =
+    (@inline; checkbounds(Bool, idxs[1], subidxs[1], subidxs[2]) && reindex_checkbounds(tail(idxs), tail(tail(subidxs))))
+reindex_checkbounds(idxs::Tuple{AbstractArray{T,N}, Vararg{Any}}, subidxs::Tuple{Vararg{Any}}) where {T,N} =
+    (@inline; checkbounds(Bool, idxs[1], subidxs[1:N]...) && reindex_checkbounds(tail(idxs), subidxs[N+1:end]))
+
 # In general, we simply re-index the parent indices by the provided ones
 SlowSubArray{T,N,P,I} = SubArray{T,N,P,I,false}
 function getindex(V::SubArray{T,N}, I::Vararg{Int,N}) where {T,N}
